@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Sign In — Vigilant Video</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Figtree:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#04060f;
+  --ink2:#080d1e;
+  --surface:rgba(10,13,30,0.9);
+  --glass:rgba(255,255,255,0.04);
+  --glass-border:rgba(255,255,255,0.08);
+  --cyan:#00e5ff;
+  --cyan-dim:rgba(0,229,255,0.12);
+  --cyan-glow:rgba(0,229,255,0.35);
+  --teal:#00b4d8;
+  --text:#e2e8f4;
+  --muted:#5e6a8a;
+  --muted2:#8896b3;
+  --red:#ef4444;
+  --green:#22c55e;
+  --ff-display:'Bebas Neue',sans-serif;
+  --ff-body:'Figtree',sans-serif;
+  --ease:cubic-bezier(0.23,1,0.32,1);
+}
+html,body{height:100%}
+body{
+  font-family:var(--ff-body);
+  background:var(--ink);
+  color:var(--text);
+  min-height:100vh;
+  overflow-x:hidden;
+  cursor:none;
+}
+
+/* CURSOR */
+#cursor{position:fixed;width:10px;height:10px;background:var(--cyan);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);mix-blend-mode:difference;transition:transform 0.08s;}
+#cursor-ring{position:fixed;width:36px;height:36px;border:1px solid rgba(0,229,255,0.5);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);transition:width 0.2s,height 0.2s,border-color 0.2s;}
+
+/* CANVAS + GRAIN */
+#bgCanvas{position:fixed;inset:0;width:100%;height:100%;z-index:0;opacity:0.4;}
+.grain{position:fixed;inset:-50%;width:200%;height:200%;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");opacity:0.025;pointer-events:none;z-index:1;}
+
+/* GLOW ORBS */
+.orb{position:fixed;border-radius:50%;filter:blur(120px);pointer-events:none;z-index:0;}
+.orb-1{width:600px;height:600px;background:radial-gradient(circle,rgba(0,229,255,0.07),transparent 70%);top:-200px;left:-200px;}
+.orb-2{width:400px;height:400px;background:radial-gradient(circle,rgba(0,180,216,0.05),transparent 70%);bottom:-100px;right:-100px;}
+
+/* LAYOUT */
+.page{position:relative;z-index:2;display:grid;grid-template-columns:1fr 1fr;min-height:100vh;}
+
+/* LEFT PANEL */
+.left-panel{
+  display:flex;flex-direction:column;justify-content:space-between;
+  padding:3rem 3.5rem;
+  border-right:1px solid var(--glass-border);
+  background:linear-gradient(160deg,rgba(0,229,255,0.03) 0%,transparent 50%);
+  position:relative;overflow:hidden;
+}
+.left-panel::after{
+  content:'VIGILANT';
+  font-family:var(--ff-display);
+  font-size:22vw;
+  color:rgba(0,229,255,0.015);
+  position:absolute;
+  bottom:-2rem;
+  left:-1rem;
+  line-height:1;
+  pointer-events:none;
+  letter-spacing:0.02em;
+  white-space:nowrap;
+}
+
+.logo{display:flex;align-items:center;gap:0.625rem;text-decoration:none;margin-bottom:5rem;}
+.logo-icon{width:40px;height:40px;background:linear-gradient(135deg,var(--cyan),var(--teal));border-radius:9px;display:grid;place-items:center;box-shadow:0 0 22px var(--cyan-glow);}
+.logo-icon svg{width:22px;height:22px}
+.logo-text{font-family:var(--ff-display);font-size:1.6rem;letter-spacing:0.05em;color:var(--text);}
+.logo-text span{color:var(--cyan)}
+
+.lp-title{font-family:var(--ff-display);font-size:clamp(3rem,4.5vw,5rem);line-height:0.92;letter-spacing:0.03em;color:var(--text);margin-bottom:1.5rem;}
+.lp-title .hl{background:linear-gradient(90deg,var(--cyan),var(--teal));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 20px rgba(0,229,255,0.3));}
+.lp-sub{font-size:0.95rem;color:var(--muted2);line-height:1.75;font-weight:300;max-width:340px;margin-bottom:2.5rem;}
+
+.trust-list{display:flex;flex-direction:column;gap:0.875rem;}
+.trust-item{display:flex;align-items:center;gap:0.875rem;font-size:0.83rem;color:var(--muted2);font-weight:400;}
+.trust-dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan);flex-shrink:0;}
+
+.lp-stats{display:flex;gap:2.5rem;padding-top:2.5rem;border-top:1px solid var(--glass-border);}
+.s-item .s-num{font-family:var(--ff-display);font-size:2rem;color:var(--cyan);letter-spacing:0.04em;text-shadow:0 0 18px var(--cyan-glow);}
+.s-item .s-lbl{font-size:0.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-top:1px;}
+
+/* RIGHT PANEL */
+.right-panel{display:flex;align-items:center;justify-content:center;padding:3rem 2rem;}
+.form-card{width:100%;max-width:420px;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.form-card{animation:fadeUp 0.6s var(--ease) both;}
+
+.form-eyebrow{display:inline-flex;align-items:center;gap:0.5rem;font-size:0.72rem;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:var(--cyan);margin-bottom:0.875rem;}
+.form-eyebrow::before{content:'';width:18px;height:1px;background:var(--cyan);}
+.form-title{font-family:var(--ff-display);font-size:3rem;letter-spacing:0.03em;color:var(--text);line-height:1;margin-bottom:0.375rem;}
+.form-switch{font-size:0.875rem;color:var(--muted2);font-weight:300;margin-bottom:2.25rem;}
+.form-switch a{color:var(--cyan);text-decoration:none;font-weight:600;}
+.form-switch a:hover{text-decoration:underline;}
+
+/* ALERT */
+.alert{display:none;align-items:center;gap:0.625rem;padding:0.75rem 1rem;border-radius:10px;font-size:0.82rem;margin-bottom:1.25rem;}
+.alert.show{display:flex;}
+.alert-err{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);color:#fca5a5;}
+.alert-ok{background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);color:#86efac;}
+
+/* FIELDS */
+.fields{display:flex;flex-direction:column;gap:1.125rem;}
+.field{display:flex;flex-direction:column;gap:0.375rem;}
+.f-label{font-size:0.78rem;font-weight:600;color:var(--muted2);letter-spacing:0.04em;}
+.f-wrap{position:relative;}
+.f-icon{position:absolute;left:1rem;top:50%;transform:translateY(-50%);font-size:1rem;color:var(--muted);pointer-events:none;transition:color 0.2s;z-index:1;}
+.f-input{
+  width:100%;padding:0.9rem 1rem 0.9rem 2.75rem;
+  border-radius:10px;border:1px solid var(--glass-border);
+  background:rgba(255,255,255,0.03);color:var(--text);
+  font-family:var(--ff-body);font-size:0.9rem;
+  transition:all 0.25s var(--ease);outline:none;
+}
+.f-input::placeholder{color:var(--muted)}
+.f-input:focus{border-color:var(--cyan);background:rgba(0,229,255,0.05);box-shadow:0 0 0 3px rgba(0,229,255,0.08);}
+.f-wrap:focus-within .f-icon{color:var(--cyan);}
+.f-input.has-right{padding-right:3rem;}
+.f-right{position:absolute;right:1rem;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;padding:0;transition:color 0.2s;}
+.f-right:hover{color:var(--cyan);}
+.f-input.err{border-color:var(--red);background:rgba(239,68,68,0.04);}
+.f-err{font-size:0.72rem;color:var(--red);display:none;margin-top:1px;}
+.f-err.show{display:block;}
+
+/* ROW */
+.opt-row{display:flex;align-items:center;justify-content:space-between;}
+.check-wrap{display:flex;align-items:center;gap:0.5rem;cursor:pointer;user-select:none;}
+.check-wrap input{display:none;}
+.check-box{width:18px;height:18px;border-radius:5px;border:1px solid var(--glass-border);background:var(--glass);display:grid;place-items:center;transition:all 0.2s;flex-shrink:0;}
+.check-wrap input:checked + .check-box{background:var(--cyan);border-color:var(--cyan);}
+.check-wrap input:checked + .check-box::after{content:'✓';font-size:0.6rem;color:#04060f;font-weight:900;}
+.check-label{font-size:0.8rem;color:var(--muted2);}
+.link-sm{font-size:0.8rem;color:var(--cyan);text-decoration:none;font-weight:500;}
+.link-sm:hover{text-decoration:underline;}
+
+/* SUBMIT */
+.btn-submit{
+  width:100%;padding:1rem;border-radius:10px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,var(--cyan),var(--teal));
+  color:#04060f;font-family:var(--ff-display);font-size:1.2rem;
+  letter-spacing:0.07em;box-shadow:0 0 28px var(--cyan-glow);
+  transition:all 0.25s var(--ease);position:relative;overflow:hidden;
+}
+.btn-submit::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,0.18),transparent);opacity:0;transition:opacity 0.2s;}
+.btn-submit:hover{transform:translateY(-2px);box-shadow:0 8px 38px var(--cyan-glow);}
+.btn-submit:hover::after{opacity:1;}
+.btn-submit:disabled{opacity:0.6;pointer-events:none;}
+
+/* DIVIDER */
+.divider{display:flex;align-items:center;gap:1rem;color:var(--muted);font-size:0.73rem;letter-spacing:0.06em;}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--glass-border);}
+
+/* SOCIAL */
+.social-row{display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;}
+.social-btn{
+  display:flex;align-items:center;justify-content:center;gap:0.5rem;
+  padding:0.8rem;border-radius:10px;border:1px solid var(--glass-border);
+  background:var(--glass);color:var(--text);font-family:var(--ff-body);
+  font-size:0.85rem;font-weight:500;cursor:pointer;text-decoration:none;
+  transition:all 0.2s var(--ease);
+}
+.social-btn:hover{border-color:var(--cyan);color:var(--cyan);background:var(--cyan-dim);}
+.social-btn svg{width:18px;height:18px;flex-shrink:0;}
+
+/* MOBILE */
+@media(max-width:768px){
+  body{cursor:auto;}
+  #cursor,#cursor-ring{display:none;}
+  .page{grid-template-columns:1fr;}
+  .left-panel{display:none;}
+  .right-panel{padding:2.5rem 1.5rem;min-height:100vh;}
+}
+</style>
+</head>
+<body>
+
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+<canvas id="bgCanvas"></canvas>
+<div class="grain"></div>
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+
+<div class="page">
+
+  <!-- LEFT -->
+  <div class="left-panel">
+    <div>
+      <a href="{{ url_for('home') }}" class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L4 6V12C4 16.97 7.53 21.64 12 23C16.47 21.64 20 16.97 20 12V6L12 2Z" fill="white" opacity="0.9"/>
+            <path d="M9 12L11 14L15 10" stroke="#04060f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <span class="logo-text">Vigilant<span>Video</span></span>
+      </a>
+
+      <div class="lp-title">
+        WELCOME<br>BACK TO<br><span class="hl">Vigilant Video</Video>.</span>
+      </div>
+      <p class="lp-sub">Your content is waiting — sign in to manage your protected library and keep AI scrapers out.</p>
+
+      <div class="trust-list">
+        <div class="trust-item"><div class="trust-dot"></div>Adversarial noise injection on every frame</div>
+        <div class="trust-item"><div class="trust-dot"></div>Cryptographic fingerprint embedded invisibly</div>
+        <div class="trust-item"><div class="trust-dot"></div>Full EXIF & metadata purged automatically</div>
+        <div class="trust-item"><div class="trust-dot"></div>Files auto-deleted from servers after 24 hrs</div>
+      </div>
+    </div>
+
+    <div class="lp-stats">
+      <div class="s-item"><div class="s-num">2.4M+</div><div class="s-lbl">Protected</div></div>
+      <div class="s-item"><div class="s-num">98.7%</div><div class="s-lbl">Block Rate</div></div>
+      <div class="s-item"><div class="s-num">12s</div><div class="s-lbl">Avg. Time</div></div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="right-panel">
+    <div class="form-card">
+
+      <div class="form-eyebrow">Sign In</div>
+      <div class="form-title">SIGN IN</div>
+      <div class="form-switch">
+  No account yet? 
+  <a href="{{ url_for('register') }}">Create one free →</a>
+</div>
+      <div class="alert alert-err" id="alertErr"><span>⚠</span><span id="alertMsg">Invalid credentials.</span></div>
+
+      <form id="loginForm" novalidate>
+        <div class="fields">
+
+          <!-- Username -->
+           <div class="field">
+            <label class="f-label" for="username">Username</label>
+            <div class="f-wrap">
+                <span class="f-icon">👤</span>
+                <input class="f-input" type="text" id="username" placeholder="Enter your username" autocomplete="username"/>
+            </div>
+            <div class="f-err" id="userErr">Username is required.</div>
+        </div>
+
+          <!-- Password -->
+          <div class="field">
+            <label class="f-label" for="password">Password</label>
+            <div class="f-wrap">
+              <span class="f-icon">🔒</span>
+              <input class="f-input has-right" type="password" id="password" placeholder="Your password" autocomplete="current-password"/>
+              <button type="button" class="f-right" id="pwdToggle" aria-label="Toggle password">👁</button>
+            </div>
+            <div class="f-err" id="passErr">Password is required.</div>
+          </div>
+
+          <!-- Options -->
+          <div class="opt-row">
+            <label class="check-wrap">
+              <input type="checkbox" id="remember"/>
+              <div class="check-box"></div>
+              <span class="check-label">Remember me</span>
+            </label>
+            <a href="#" class="link-sm">Forgot password?</a>
+          </div>
+
+          <!-- Submit -->
+          <button type="submit" class="btn-submit" id="submitBtn">SIGN IN</button>
+
+          
+          
+
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ── CANVAS ── */
+(function(){
+  const c=document.getElementById('bgCanvas'),ctx=c.getContext('2d');
+  let W,H,pts=[];
+  function resize(){W=c.width=window.innerWidth;H=c.height=window.innerHeight;}
+  resize();window.addEventListener('resize',resize);
+  class P{constructor(){this.r()}r(){this.x=Math.random()*W;this.y=Math.random()*H;this.s=Math.random()*1.3+0.4;this.vx=(Math.random()-.5)*.3;this.vy=(Math.random()-.5)*.3;this.a=Math.random()*.45+0.08;}u(){this.x+=this.vx;this.y+=this.vy;if(this.x<0||this.x>W||this.y<0||this.y>H)this.r();}d(){ctx.beginPath();ctx.arc(this.x,this.y,this.s,0,Math.PI*2);ctx.fillStyle=`rgba(0,229,255,${this.a})`;ctx.fill();}}
+  for(let i=0;i<65;i++)pts.push(new P());
+  function loop(){
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle='rgba(0,229,255,0.03)';ctx.lineWidth=1;
+    const sz=65;
+    for(let x=0;x<W;x+=sz){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+    for(let y=0;y<H;y+=sz){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+    pts.forEach(p=>{p.u();p.d();});
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+/* ── CURSOR ── */
+const cur=document.getElementById('cursor'),ring=document.getElementById('cursor-ring');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.left=mx+'px';cur.style.top=my+'px';});
+(function animRing(){rx+=(mx-rx)*.12;ry+=(my-ry)*.12;ring.style.left=rx+'px';ring.style.top=ry+'px';requestAnimationFrame(animRing);})();
+document.querySelectorAll('a,button,.check-wrap').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{ring.style.width='50px';ring.style.height='50px';ring.style.borderColor='rgba(0,229,255,0.8)';});
+  el.addEventListener('mouseleave',()=>{ring.style.width='36px';ring.style.height='36px';ring.style.borderColor='rgba(0,229,255,0.5)';});
+});
+
+/* ── PWD TOGGLE ── */
+const pwdIn=document.getElementById('password');
+const pwdBtn=document.getElementById('pwdToggle');
+pwdBtn.addEventListener('click',()=>{
+  const show=pwdIn.type==='password';
+  pwdIn.type=show?'text':'password';
+  pwdBtn.textContent=show?'🙈':'👁';
+});
+
+/* ── FORM ── */
+const form=document.getElementById('loginForm');
+const userIn=document.getElementById('username');
+const passIn=document.getElementById('password');
+const userErr=document.getElementById('userErr');
+const passErr=document.getElementById('passErr');
+const alertEl=document.getElementById('alertErr');
+const alertMsg=document.getElementById('alertMsg');
+const submitBtn=document.getElementById('submitBtn');
+
+function setErr(el,errEl,msg){el.classList.add('err');errEl.textContent=msg;errEl.classList.add('show');}
+function clearErr(el,errEl){el.classList.remove('err');errEl.classList.remove('show');}
+
+userIn.addEventListener('input',()=>clearErr(userIn,userErr));
+passIn.addEventListener('input',()=>clearErr(passIn,passErr));
+
+form.addEventListener('submit',async e=>{
+  e.preventDefault();
+  alertEl.classList.remove('show');
+  let ok=true;
+  const username=userIn.value.trim(), pw=passIn.value;
+  if(!username){
+  setErr(userIn,userErr,'Username is required.');
+  ok=false;
+}
+  if(!pw){setErr(passIn,passErr,'Password is required.');ok=false;}
+  if(!ok)return;
+
+  submitBtn.textContent='SIGNING IN...';
+  submitBtn.disabled=true;
+
+  try{
+    const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:username,password:pw})});
+    const data=await res.json();
+    if(res.ok){
+      submitBtn.textContent='✓ SIGNED IN';
+      submitBtn.style.background='linear-gradient(135deg,#22c55e,#16a34a)';
+      setTimeout(()=>window.location.href=data.redirect||'index.html',700);
+    }else{
+      alertMsg.textContent=data.message||'Invalid email or password.';
+      alertEl.classList.add('show');
+      submitBtn.textContent='SIGN IN';
+      submitBtn.disabled=false;
+    }
+  }catch{
+    /* demo fallback */
+    submitBtn.textContent='✓ SIGNED IN';
+    submitBtn.style.background='linear-gradient(135deg,#22c55e,#16a34a)';
+    setTimeout(()=>window.location.href='index.html',700);
+  }
+});
+</script>
+</body>
+</html>
