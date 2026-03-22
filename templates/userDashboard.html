@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Dashboard — ShieldAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Figtree:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#04060f;
+  --ink2:#080d1e;
+  --ink3:#0c1122;
+  --surface:rgba(10,13,30,0.9);
+  --glass:rgba(255,255,255,0.04);
+  --glass2:rgba(255,255,255,0.06);
+  --glass-border:rgba(255,255,255,0.08);
+  --glass-border2:rgba(255,255,255,0.12);
+  --cyan:#00e5ff;
+  --cyan-dim:rgba(0,229,255,0.12);
+  --cyan-glow:rgba(0,229,255,0.3);
+  --teal:#00b4d8;
+  --amber:#f59e0b;
+  --red:#ef4444;
+  --green:#22c55e;
+  --blue:#3b82f6;
+  --text:#e2e8f4;
+  --muted:#5e6a8a;
+  --muted2:#8896b3;
+  --ff-display:'Bebas Neue',sans-serif;
+  --ff-body:'Figtree',sans-serif;
+  --ease:cubic-bezier(0.23,1,0.32,1);
+  --sidebar:240px;
+}
+html{font-size:16px}
+body{
+  font-family:var(--ff-body);
+  background:var(--ink);
+  color:var(--text);
+  min-height:100vh;
+  overflow-x:hidden;
+  cursor:none;
+}
+
+/* ══ CURSOR ══ */
+#cursor{position:fixed;width:9px;height:9px;background:var(--cyan);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);mix-blend-mode:difference;}
+#cursor-ring{position:fixed;width:32px;height:32px;border:1px solid rgba(0,229,255,0.45);border-radius:50%;pointer-events:none;z-index:9998;transform:translate(-50%,-50%);transition:width 0.18s,height 0.18s,border-color 0.18s;}
+
+/* ══ CANVAS + GRAIN ══ */
+#bgCanvas{position:fixed;inset:0;width:100%;height:100%;z-index:0;opacity:0.3;}
+.grain{position:fixed;inset:-50%;width:200%;height:200%;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");opacity:0.022;pointer-events:none;z-index:1;}
+
+/* ══ AUTH GATE ══ */
+#authGate{
+  position:fixed;inset:0;z-index:500;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(4,6,15,0.96);backdrop-filter:blur(20px);
+}
+#authGate.hidden{display:none;}
+.gate-card{
+  background:var(--ink3);border:1px solid var(--glass-border2);
+  border-radius:18px;padding:3rem;text-align:center;max-width:420px;width:90%;
+  animation:popIn 0.5s var(--ease) both;
+}
+@keyframes popIn{from{opacity:0;transform:scale(0.94) translateY(20px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.gate-icon{width:64px;height:64px;background:linear-gradient(135deg,var(--cyan),var(--teal));border-radius:16px;display:grid;place-items:center;margin:0 auto 1.5rem;box-shadow:0 0 30px var(--cyan-glow);}
+.gate-icon svg{width:34px;height:34px;}
+.gate-title{font-family:var(--ff-display);font-size:2rem;letter-spacing:0.04em;margin-bottom:0.5rem;}
+.gate-sub{font-size:0.9rem;color:var(--muted2);line-height:1.65;font-weight:300;margin-bottom:2rem;}
+.gate-btns{display:flex;flex-direction:column;gap:0.75rem;}
+.gate-btn{
+  width:100%;padding:0.875rem;border-radius:10px;border:none;cursor:pointer;
+  font-family:var(--ff-display);font-size:1.1rem;letter-spacing:0.06em;
+  transition:all 0.25s var(--ease);text-decoration:none;display:block;text-align:center;
+}
+.gate-btn.primary{background:linear-gradient(135deg,var(--cyan),var(--teal));color:#04060f;box-shadow:0 0 24px var(--cyan-glow);}
+.gate-btn.primary:hover{transform:translateY(-2px);box-shadow:0 8px 32px var(--cyan-glow);}
+.gate-btn.secondary{background:var(--glass);border:1px solid var(--glass-border2);color:var(--text);}
+.gate-btn.secondary:hover{border-color:var(--cyan);color:var(--cyan);background:var(--cyan-dim);}
+
+/* ══ LAYOUT ══ */
+#app{position:relative;z-index:2;display:flex;min-height:100vh;}
+
+/* ══ MAIN ══ */
+.main{flex:1;display:flex;flex-direction:column;min-height:100vh;}
+/* ══ TOPBAR ══ */
+.topbar{
+  position:sticky;top:0;z-index:40;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0.875rem 2rem;
+  background:rgba(4,6,15,0.92);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--glass-border);
+}
+.topbar-left{display:flex;align-items:center;gap:1rem;}
+.page-title{font-family:var(--ff-display);font-size:1.5rem;letter-spacing:0.04em;color:var(--text);}
+.live-badge{display:inline-flex;align-items:center;gap:0.4rem;font-size:0.68rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:3px 10px;border-radius:99px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.2);color:var(--green);}
+.live-badge::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--green);animation:blink 1.5s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+.topbar-right{display:flex;align-items:center;gap:0.75rem;}
+.tb-btn{
+  display:flex;align-items:center;gap:0.5rem;
+  padding:0.55rem 1.125rem;border-radius:8px;
+  font-family:var(--ff-body);font-size:0.82rem;font-weight:600;
+  cursor:pointer;border:1px solid var(--glass-border);background:var(--glass);
+  color:var(--text);transition:all 0.2s;
+}
+.tb-btn:hover{border-color:var(--cyan);color:var(--cyan);background:var(--cyan-dim);}
+.tb-btn.primary{background:linear-gradient(135deg,var(--cyan),var(--teal));border:none;color:#04060f;font-weight:700;box-shadow:0 0 16px var(--cyan-glow);}
+.tb-btn.primary:hover{transform:translateY(-1px);box-shadow:0 6px 24px var(--cyan-glow);}
+.notif-btn{
+  width:36px;height:36px;border-radius:9px;border:1px solid var(--glass-border);
+  background:var(--glass);display:grid;place-items:center;cursor:pointer;
+  position:relative;transition:all 0.2s;font-size:1rem;
+}
+.notif-btn:hover{border-color:var(--cyan);}
+.notif-dot{position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--red);border:1.5px solid var(--ink);animation:blink 2s ease-in-out infinite;}
+
+/* ══ ALERT BANNER ══ */
+.alert-banner{
+  display:flex;align-items:center;gap:0.875rem;
+  padding:0.875rem 2rem;
+  background:rgba(239,68,68,0.08);border-bottom:1px solid rgba(239,68,68,0.2);
+  font-size:0.85rem;color:#fca5a5;
+}
+.ab-icon{font-size:1.1rem;flex-shrink:0;}
+.ab-text strong{color:#fca5a5;}
+.ab-dismiss{margin-left:auto;background:none;border:none;color:rgba(252,165,165,0.6);cursor:pointer;font-size:0.8rem;font-family:var(--ff-body);transition:color 0.2s;flex-shrink:0;}
+.ab-dismiss:hover{color:#fca5a5;}
+.alert-banner.hidden{display:none;}
+
+/* ══ CONTENT AREA ══ */
+.content{padding:1.75rem 2rem;flex:1;}
+
+/* ══ STAT CARDS ══ */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.75rem;}
+.stat-card{
+  background:var(--glass);border:1px solid var(--glass-border);
+  border-radius:14px;padding:1.25rem 1.5rem;
+  transition:all 0.3s var(--ease);position:relative;overflow:hidden;
+}
+.stat-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,var(--cyan-dim),transparent 60%);opacity:0;transition:opacity 0.3s;}
+.stat-card:hover{border-color:rgba(0,229,255,0.25);transform:translateY(-2px);}
+.stat-card:hover::before{opacity:1;}
+.sc-label{font-size:0.75rem;color:var(--muted2);font-weight:500;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.5rem;}
+.sc-val{font-family:var(--ff-display);font-size:2.5rem;letter-spacing:0.03em;line-height:1;}
+.sc-val.cyan{color:var(--cyan);text-shadow:0 0 18px var(--cyan-glow);}
+.sc-val.amber{color:var(--amber);text-shadow:0 0 18px rgba(245,158,11,0.3);}
+.sc-val.red{color:var(--red);text-shadow:0 0 18px rgba(239,68,68,0.3);}
+.sc-val.green{color:var(--green);text-shadow:0 0 18px rgba(34,197,94,0.3);}
+.sc-sub{font-size:0.75rem;color:var(--muted);margin-top:4px;}
+.sc-sub.up{color:var(--green);}
+.sc-sub.warn{color:var(--amber);}
+
+/* ══ MAIN GRID ══ */
+.main-grid{display:grid;grid-template-columns:1fr 320px;gap:1.25rem;}
+
+/* ══ PANEL ══ */
+.panel{background:var(--glass);border:1px solid var(--glass-border);border-radius:14px;overflow:hidden;}
+.panel-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1rem 1.375rem;border-bottom:1px solid var(--glass-border);
+}
+.panel-title{font-size:0.875rem;font-weight:700;color:var(--text);}
+.panel-meta{font-size:0.75rem;color:var(--muted);}
+.panel-link{font-size:0.78rem;color:var(--cyan);text-decoration:none;font-weight:500;}
+.panel-link:hover{text-decoration:underline;}
+
+/* ══ VIDEO TABLE ══ */
+.vid-table{width:100%;border-collapse:collapse;}
+.vid-table th{
+  padding:0.6rem 1.375rem;text-align:left;
+  font-size:0.68rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;
+  color:var(--muted);border-bottom:1px solid var(--glass-border);
+}
+.vid-table td{
+  padding:0.875rem 1.375rem;font-size:0.85rem;color:var(--text);
+  border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:middle;
+}
+.vid-table tr:last-child td{border-bottom:none;}
+.vid-table tr:hover td{background:rgba(255,255,255,0.02);}
+.vid-name{font-weight:600;display:flex;align-items:center;gap:0.5rem;}
+.vid-name .ext{font-size:0.68rem;background:rgba(255,255,255,0.07);border-radius:4px;padding:1px 6px;color:var(--muted2);font-weight:500;text-transform:uppercase;}
+.vid-date{color:var(--muted2);}
+.vid-size{color:var(--muted2);}
+
+/* STATUS PILLS */
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:99px;font-size:0.72rem;font-weight:600;}
+.pill-dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0;}
+.pill.protected{background:rgba(34,197,94,0.12);color:var(--green);border:1px solid rgba(34,197,94,0.2);}
+.pill.processing{background:rgba(245,158,11,0.12);color:var(--amber);border:1px solid rgba(245,158,11,0.2);animation:processPulse 2s ease-in-out infinite;}
+@keyframes processPulse{0%,100%{opacity:1}50%{opacity:0.7}}
+.pill.failed{background:rgba(239,68,68,0.12);color:var(--red);border:1px solid rgba(239,68,68,0.2);}
+.pill.queued{background:rgba(139,92,246,0.12);color:#a78bfa;border:1px solid rgba(139,92,246,0.2);}
+
+/* ACTION BTNS */
+.act-btn{
+  padding:0.35rem 0.875rem;border-radius:7px;font-size:0.78rem;font-weight:600;
+  font-family:var(--ff-body);cursor:pointer;border:1px solid var(--glass-border);
+  background:var(--glass);color:var(--muted2);transition:all 0.2s;
+}
+.act-btn:hover{border-color:var(--cyan);color:var(--cyan);background:var(--cyan-dim);}
+.act-btn.danger:hover{border-color:var(--red);color:var(--red);background:rgba(239,68,68,0.1);}
+.act-btn.amber:hover{border-color:var(--amber);color:var(--amber);background:rgba(245,158,11,0.1);}
+.progress-cell{display:flex;align-items:center;gap:0.625rem;}
+.mini-prog{flex:1;max-width:80px;height:4px;background:rgba(255,255,255,0.08);border-radius:99px;overflow:hidden;}
+.mini-prog-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--amber),var(--cyan));transition:width 0.3s;}
+.mini-pct{font-size:0.75rem;color:var(--amber);font-weight:600;white-space:nowrap;}
+
+/* ══ UPLOAD DROPZONE ══ */
+.upload-zone{
+  margin:0 1.375rem 1.375rem;
+  border:1.5px dashed rgba(0,229,255,0.2);border-radius:12px;
+  padding:1.5rem;text-align:center;
+  background:rgba(0,229,255,0.02);cursor:pointer;
+  transition:all 0.3s var(--ease);
+}
+.upload-zone:hover,.upload-zone.drag-over{border-color:var(--cyan);background:rgba(0,229,255,0.05);box-shadow:0 0 20px rgba(0,229,255,0.08);}
+.uz-icon{font-size:1.5rem;margin-bottom:0.375rem;}
+.uz-text{font-size:0.82rem;color:var(--muted2);font-weight:500;}
+.uz-text span{color:var(--cyan);font-weight:600;}
+.uz-sub{font-size:0.72rem;color:var(--muted);margin-top:2px;}
+
+/* ══ PROCESSING QUEUE ══ */
+.queue-body{padding:1rem 1.375rem;display:flex;flex-direction:column;gap:1rem;}
+.q-item{}
+.q-item-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.q-name{font-size:0.83rem;font-weight:600;color:var(--text);}
+.q-pct{font-size:0.78rem;font-weight:700;}
+.q-pct.amber{color:var(--amber);}
+.q-pct.cyan{color:var(--cyan);}
+.q-bar-track{width:100%;height:5px;background:rgba(255,255,255,0.07);border-radius:99px;overflow:hidden;margin-bottom:5px;}
+.q-bar-fill{height:100%;border-radius:99px;transition:width 1s var(--ease);}
+.q-bar-fill.amber{background:linear-gradient(90deg,var(--amber),#fbbf24);}
+.q-bar-fill.cyan{background:linear-gradient(90deg,var(--cyan),var(--teal));}
+.q-stage{font-size:0.72rem;color:var(--muted);}
+.queue-empty{padding:2rem 1.375rem;text-align:center;color:var(--muted);font-size:0.85rem;}
+
+/* ══ ACTIVITY FEED ══ */
+.feed-body{padding:0.75rem 1.375rem;display:flex;flex-direction:column;}
+.feed-item{
+  display:flex;align-items:flex-start;gap:0.875rem;
+  padding:0.75rem 0;border-bottom:1px solid rgba(255,255,255,0.04);
+}
+.feed-item:last-child{border-bottom:none;}
+.feed-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px;}
+.feed-dot.red{background:var(--red);box-shadow:0 0 6px rgba(239,68,68,0.5);}
+.feed-dot.green{background:var(--green);box-shadow:0 0 6px rgba(34,197,94,0.5);}
+.feed-dot.amber{background:var(--amber);box-shadow:0 0 6px rgba(245,158,11,0.5);}
+.feed-dot.blue{background:var(--blue);box-shadow:0 0 6px rgba(59,130,246,0.5);}
+.feed-dot.cyan{background:var(--cyan);box-shadow:0 0 6px var(--cyan-glow);}
+.feed-content{}
+.feed-text{font-size:0.82rem;color:var(--muted2);line-height:1.5;}
+.feed-text strong{color:var(--text);font-weight:600;}
+.feed-time{font-size:0.7rem;color:var(--muted);margin-top:2px;}
+
+/* ══ UPLOAD MODAL ══ */
+#uploadModal{
+  position:fixed;inset:0;z-index:200;
+  display:none;align-items:center;justify-content:center;
+  background:rgba(4,6,15,0.88);backdrop-filter:blur(12px);
+  padding:1rem;
+}
+#uploadModal.open{display:flex;}
+.modal-card{
+  background:var(--ink3);border:1px solid var(--glass-border2);
+  border-radius:18px;width:100%;max-width:520px;overflow:hidden;
+  animation:popIn 0.4s var(--ease) both;
+}
+.modal-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1.25rem 1.75rem;border-bottom:1px solid var(--glass-border);
+}
+.modal-title{font-family:var(--ff-display);font-size:1.4rem;letter-spacing:0.04em;}
+.modal-close{width:30px;height:30px;border-radius:7px;border:1px solid var(--glass-border);background:var(--glass);color:var(--muted2);cursor:pointer;display:grid;place-items:center;font-size:1rem;transition:all 0.2s;}
+.modal-close:hover{border-color:var(--red);color:var(--red);}
+.modal-body{padding:1.75rem;}
+.m-drop{
+  border:1.5px dashed rgba(0,229,255,0.3);border-radius:12px;padding:2.5rem 2rem;
+  text-align:center;cursor:pointer;background:rgba(0,229,255,0.03);
+  transition:all 0.3s var(--ease);
+}
+.m-drop:hover,.m-drop.drag-over{border-color:var(--cyan);background:rgba(0,229,255,0.07);box-shadow:0 0 24px rgba(0,229,255,0.1);}
+.m-drop-icon{font-size:2.5rem;margin-bottom:0.75rem;}
+.m-drop-title{font-size:1rem;font-weight:600;color:var(--text);margin-bottom:4px;}
+.m-drop-sub{font-size:0.8rem;color:var(--muted);margin-bottom:1rem;}
+.m-browse{padding:0.5rem 1.25rem;border-radius:8px;border:1px solid rgba(0,229,255,0.3);background:transparent;color:var(--cyan);font-family:var(--ff-body);font-size:0.82rem;font-weight:600;cursor:pointer;transition:all 0.2s;}
+.m-browse:hover{background:var(--cyan-dim);}
+.m-file-info{margin-top:1.25rem;display:none;padding:0.875rem 1rem;border-radius:10px;background:rgba(0,229,255,0.05);border:1px solid rgba(0,229,255,0.15);}
+.m-file-info.show{display:block;}
+.m-fi-row{display:flex;align-items:center;gap:0.75rem;margin-bottom:0.625rem;}
+.m-fi-name{font-size:0.88rem;font-weight:600;}
+.m-fi-size{font-size:0.75rem;color:var(--muted);}
+.m-prog-wrap{height:5px;background:rgba(255,255,255,0.07);border-radius:99px;overflow:hidden;}
+.m-prog-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--cyan),var(--teal));border-radius:99px;transition:width 0.2s;box-shadow:0 0 8px var(--cyan-glow);}
+.m-submit{
+  width:100%;margin-top:1.25rem;padding:0.9rem;border-radius:10px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,var(--cyan),var(--teal));color:#04060f;
+  font-family:var(--ff-display);font-size:1.15rem;letter-spacing:0.06em;
+  box-shadow:0 0 24px var(--cyan-glow);transition:all 0.25s var(--ease);
+}
+.m-submit:hover{transform:translateY(-2px);box-shadow:0 8px 32px var(--cyan-glow);}
+.m-submit:disabled{opacity:0.5;pointer-events:none;}
+
+/* ══ STORAGE BAR ══ */
+.storage-card{
+  background:var(--glass);border:1px solid var(--glass-border);
+  border-radius:14px;padding:1.125rem 1.375rem;margin-bottom:1.25rem;
+}
+.storage-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.875rem;}
+.storage-title{font-size:0.78rem;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em;}
+.storage-nums{font-size:0.82rem;color:var(--muted2);}
+.storage-nums strong{color:var(--text);}
+.storage-bar-track{width:100%;height:7px;background:rgba(255,255,255,0.07);border-radius:99px;overflow:hidden;}
+.storage-bar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--cyan),var(--teal));box-shadow:0 0 8px var(--cyan-glow);transition:width 1s var(--ease);}
+
+/* ══ LOGOUT CONFIRM ══ */
+#logoutModal{position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;background:rgba(4,6,15,0.88);backdrop-filter:blur(12px);}
+#logoutModal.open{display:flex;}
+.logout-card{background:var(--ink3);border:1px solid var(--glass-border2);border-radius:16px;padding:2rem;max-width:340px;width:90%;text-align:center;animation:popIn 0.35s var(--ease) both;}
+.lc-title{font-family:var(--ff-display);font-size:1.6rem;margin-bottom:0.5rem;}
+.lc-sub{font-size:0.85rem;color:var(--muted2);font-weight:300;margin-bottom:1.5rem;line-height:1.6;}
+.lc-btns{display:flex;gap:0.75rem;}
+.lc-btn{flex:1;padding:0.75rem;border-radius:9px;cursor:pointer;font-family:var(--ff-body);font-size:0.88rem;font-weight:600;transition:all 0.2s;border:none;}
+.lc-btn.cancel{background:var(--glass);border:1px solid var(--glass-border);color:var(--text);}
+.lc-btn.cancel:hover{border-color:var(--cyan);color:var(--cyan);}
+.lc-btn.confirm{background:linear-gradient(135deg,var(--red),#dc2626);color:white;}
+.lc-btn.confirm:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(239,68,68,0.35);}
+
+/* ══ MOBILE ══ */
+@media(max-width:1024px){.main-grid{grid-template-columns:1fr;}.stats-row{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:768px){
+  body{cursor:auto;}
+  #cursor,#cursor-ring{display:none;}
+  .stats-row{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+</head>
+<body>
+
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+<canvas id="bgCanvas"></canvas>
+<div class="grain"></div>
+
+<!-- ══ AUTH GATE ══ -->
+<div id="authGate">
+  <div class="gate-card">
+    <div class="gate-icon">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M12 2L4 6V12C4 16.97 7.53 21.64 12 23C16.47 21.64 20 16.97 20 12V6L12 2Z" fill="white" opacity="0.9"/>
+        <path d="M9 12L11 14L15 10" stroke="#04060f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div class="gate-title">ACCESS REQUIRED</div>
+    <p class="gate-sub">You need to be signed in to access your ShieldAI dashboard. Sign in to manage your protected videos.</p>
+    <div class="gate-btns">
+      <a href="login.html" class="gate-btn primary">SIGN IN</a>
+      <a href="register.html" class="gate-btn secondary">Create Free Account</a>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MAIN APP ══ -->
+<div id="app">
+  <!-- MAIN CONTENT -->
+  <main class="main">
+
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="page-title">DASHBOARD</div>
+        <div class="live-badge">Live</div>
+      </div>
+      <div class="topbar-right">
+        <div class="notif-btn" id="notifBtn">🔔<div class="notif-dot"></div></div>
+        <button class="tb-btn primary" onclick="openUploadModal()">
+          ⬆ Protect Video
+        </button>
+      </div>
+    </div>
+
+    <!-- ALERT BANNER -->
+    <div class="alert-banner" id="alertBanner">
+      <span class="ab-icon">⚠</span>
+      <span class="ab-text"><strong>Security alert:</strong> A watermarked copy of "brand_launch.mp4" was detected on an external site.</span>
+      <button class="ab-dismiss" onclick="document.getElementById('alertBanner').classList.add('hidden')">Dismiss</button>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content">
+
+      <!-- STATS -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="sc-label">Total Videos Protected</div>
+          <div class="sc-val cyan" id="statVideos">24</div>
+          <div class="sc-sub up">+3 this week</div>
+        </div>
+        <div class="stat-card">
+          <div class="sc-label">Processing Now</div>
+          <div class="sc-val amber" id="statProc">2</div>
+          <div class="sc-sub warn">est. 4 min remaining</div>
+        </div>
+        <div class="stat-card">
+          <div class="sc-label">Scrape Attempts Blocked</div>
+          <div class="sc-val red" id="statBlocked">138</div>
+          <div class="sc-sub up">+12 today</div>
+        </div>
+        <div class="stat-card">
+          <div class="sc-label">Storage Used</div>
+          <div class="sc-val green" id="statStorage">6.2 GB</div>
+          <div class="sc-sub">of 10 GB</div>
+        </div>
+      </div>
+
+      <!-- STORAGE BAR -->
+      <div class="storage-card">
+        <div class="storage-head">
+          <span class="storage-title">Storage</span>
+          <span class="storage-nums"><strong>6.2 GB</strong> of 10 GB used</span>
+        </div>
+        <div class="storage-bar-track">
+          <div class="storage-bar-fill" id="storageFill" style="width:62%"></div>
+        </div>
+      </div>
+
+      <!-- MAIN GRID -->
+      <div class="main-grid">
+
+        <!-- VIDEO LIBRARY -->
+        <div>
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <div class="panel-title">Video Library</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:1rem;">
+                <span class="panel-meta" id="libTotal">24 total</span>
+                <a href="#" class="panel-link" onclick="return false;">View all</a>
+              </div>
+            </div>
+
+            <!-- Upload dropzone inside library -->
+            <div class="upload-zone" id="libDropZone" onclick="openUploadModal()">
+              <div class="uz-icon">📁</div>
+              <div class="uz-text">Drop a video or <span>browse to upload</span></div>
+              <div class="uz-sub">MP4 · MOV · AVI · MKV — up to 10 GB</div>
+            </div>
+
+            <table class="vid-table">
+              <thead>
+                <tr>
+                  <th>Filename</th>
+                  <th>Uploaded</th>
+                  <th>Size</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="videoTableBody">
+                <!-- Populated by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN -->
+        <div style="display:flex;flex-direction:column;gap:1.25rem;">
+
+          <!-- PROCESSING QUEUE -->
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-title">Processing Queue</div>
+              <span class="panel-meta" id="jobCount">2 jobs</span>
+            </div>
+            <div class="queue-body" id="queueBody">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+          <!-- ACTIVITY FEED -->
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-title">Activity Feed</div>
+              <a href="#" class="panel-link" onclick="return false;">View all</a>
+            </div>
+            <div class="feed-body" id="feedBody">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div><!-- /content -->
+  </main>
+</div><!-- /app -->
+
+<!-- ══ UPLOAD MODAL ══ -->
+<div id="uploadModal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div class="modal-title">PROTECT A VIDEO</div>
+      <button class="modal-close" onclick="closeUploadModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="file" id="fileInput" accept=".mp4,.mov,.avi,.mkv" style="display:none"/>
+      <div class="m-drop" id="mDrop" onclick="document.getElementById('fileInput').click()">
+        <div class="m-drop-icon">🎬</div>
+        <div class="m-drop-title">Drop your video here</div>
+        <div class="m-drop-sub">MP4 · MOV · AVI · MKV · up to 10 GB</div>
+        <button class="m-browse" type="button">Browse Files</button>
+      </div>
+      <div class="m-file-info" id="mFileInfo">
+        <div class="m-fi-row">
+          <span style="font-size:1.25rem">🎬</span>
+          <div>
+            <div class="m-fi-name" id="mFileName">—</div>
+            <div class="m-fi-size" id="mFileSize">—</div>
+          </div>
+        </div>
+        <div class="m-prog-wrap"><div class="m-prog-fill" id="mProgFill"></div></div>
+      </div>
+      <button class="m-submit" id="mSubmit" disabled onclick="startUpload()">UPLOAD & PROTECT</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ LOGOUT MODAL ══ -->
+<div id="logoutModal">
+  <div class="logout-card">
+    <div class="lc-title">SIGN OUT?</div>
+    <p class="lc-sub">You'll be redirected to the login page. Your protected videos will remain safe.</p>
+    <div class="lc-btns">
+      <button class="lc-btn cancel" onclick="closeLogoutModal()">Cancel</button>
+      <button class="lc-btn confirm" onclick="doLogout()">Sign Out</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════
+// AUTH CHECK
+// ══════════════════════════════════════
+const SESSION_KEY = 'shieldai_user';
+
+function checkAuth() {
+  const user = getUser();
+  if (!user) {
+    document.getElementById('authGate').classList.remove('hidden');
+  } else {
+    document.getElementById('authGate').classList.add('hidden');
+    loadUserData(user);
+  }
+}
+
+function getUser() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+// ══════════════════════════════════════
+// SESSION KEY (keep this — don't change)
+// ══════════════════════════════════════
+
+// ══════════════════════════════════════
+// REAL DATA — fetched from your Flask API
+// ══════════════════════════════════════
+let videos = [];   // filled by loadDashboard()
+let queue  = [];   // filled by loadDashboard()
+let feed   = [];   // filled by loadDashboard()
+
+// ══════════════════════════════════════
+// LOAD DASHBOARD FROM REAL DATABASE
+// ══════════════════════════════════════
+async function loadDashboard() {
+  try {
+    const res  = await fetch('/api/dashboard');
+    const data = await res.json();
+
+    // If not logged in, Flask returns 401 → go to login
+    if (res.status === 401) {
+      window.location.href = '/login';
+      return;
+    }
+
+    if (!res.ok) {
+      console.error('Dashboard load failed:', data.message);
+      return;
+    }
+
+    // ── User info (sidebar) ─────────────────────────────
+    document.getElementById('userName').textContent     = data.user.username || 'User';
+    document.getElementById('userInitials').textContent = data.user.initials || 'U';
+
+    // ── Stat cards ──────────────────────────────────────
+    document.getElementById('statVideos').textContent   = data.stats.videos_protected;
+    document.getElementById('statProc').textContent     = data.stats.processing_now;
+    document.getElementById('statBlocked').textContent  = data.stats.scrape_attempts_blocked;
+
+    // ── Storage bar ─────────────────────────────────────
+    const usedBytes  = data.stats.storage_used_bytes;
+    const limitBytes = data.stats.storage_limit_bytes;
+    const pct        = limitBytes > 0
+      ? Math.min((usedBytes / limitBytes) * 100, 100).toFixed(1)
+      : 0;
+
+    document.getElementById('storageFill').style.width = pct + '%';
+
+    // Format storage for display (e.g. "6.2 GB of 10 GB")
+    document.querySelector('.storage-nums').innerHTML =
+      `<strong>${fmtBytes(usedBytes)}</strong> of ${fmtBytes(limitBytes)} used`;
+
+    // ── Video library (real uploads from DB) ────────────
+    videos = data.videos;   // array of real job rows
+
+    // ── Activity feed (real download + completion logs) ─
+    feed = data.feed;
+
+    // ── Processing queue ────────────────────────────────
+    // Jobs with status 'pending' or 'processing'
+    queue = data.videos
+      .filter(v => v.status === 'pending' || v.status === 'processing')
+      .map(v => ({
+        name:  v.name + '.' + v.ext,
+        pct:   0,
+        stage: 'Queued · starting soon',
+        color: 'cyan',
+      }));
+
+    // ── Render everything ───────────────────────────────
+    renderTable();
+    renderQueue();
+    renderFeed();
+
+    // ── Update counters in sidebar ──────────────────────
+    document.getElementById('libCount').textContent   = data.videos.length;
+    document.getElementById('queueCount').textContent = queue.length;
+    document.getElementById('libTotal').textContent   = `${data.videos.length} total`;
+    document.getElementById('statVideos').textContent = data.stats.videos_protected;
+
+  } catch (err) {
+    console.error('Network error loading dashboard:', err);
+  }
+}
+
+// ══════════════════════════════════════
+// HELPER — format bytes to human readable
+// ══════════════════════════════════════
+function fmtBytes(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
+}
+// ══════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════
+function renderTable() {
+  const tbody = document.getElementById('videoTableBody');
+  tbody.innerHTML = videos.map(v => {
+    let statusPill = '';
+    let actionCell = '';
+    if (v.status === 'protected') {
+      statusPill = `<span class="pill protected"><span class="pill-dot"></span>Protected</span>`;
+      actionCell = `<button class="act-btn">Download</button>`;
+    } else if (v.status === 'processing') {
+      statusPill = `<span class="pill processing"><span class="pill-dot"></span>Processing</span>`;
+      actionCell = `<div class="progress-cell"><div class="mini-prog"><div class="mini-prog-fill" style="width:${v.progress}%"></div></div><span class="mini-pct">${v.progress}%...</span></div>`;
+    } else if (v.status === 'failed') {
+      statusPill = `<span class="pill failed"><span class="pill-dot"></span>Failed</span>`;
+      actionCell = `<button class="act-btn amber">Retry</button>`;
+    } else if (v.status === 'queued') {
+      statusPill = `<span class="pill queued"><span class="pill-dot"></span>Queued</span>`;
+      actionCell = `<span style="font-size:0.75rem;color:var(--muted)">Waiting...</span>`;
+    }
+    return `<tr>
+      <td><div class="vid-name">${v.name}<span class="ext">${v.ext}</span></div></td>
+      <td><span class="vid-date">${v.date}</span></td>
+      <td><span class="vid-size">${v.size}</span></td>
+      <td>${statusPill}</td>
+      <td>${actionCell}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('libTotal').textContent = `${videos.length} total`;
+  document.getElementById('libCount').textContent = videos.length;
+  document.getElementById('statVideos').textContent = videos.filter(v=>v.status==='protected').length;
+}
+
+function renderQueue() {
+  const body = document.getElementById('queueBody');
+  if (queue.length === 0) {
+    body.innerHTML = `<div class="queue-empty">No jobs in queue — all clear ✓</div>`;
+    document.getElementById('jobCount').textContent = '0 jobs';
+    document.getElementById('queueCount').textContent = '0';
+    return;
+  }
+  body.innerHTML = queue.map(q => `
+    <div class="q-item">
+      <div class="q-item-top">
+        <span class="q-name">${q.name}</span>
+        <span class="q-pct ${q.color}">${q.pct}%</span>
+      </div>
+      <div class="q-bar-track"><div class="q-bar-fill ${q.color}" style="width:${q.pct}%"></div></div>
+      <div class="q-stage">${q.stage}</div>
+    </div>`).join('');
+  document.getElementById('jobCount').textContent = `${queue.length} job${queue.length!==1?'s':''}`;
+  document.getElementById('queueCount').textContent = queue.length;
+}
+
+function renderFeed() {
+  document.getElementById('feedBody').innerHTML = feed.map(f => `
+    <div class="feed-item">
+      <div class="feed-dot ${f.dot}"></div>
+      <div class="feed-content">
+        <div class="feed-text">${f.text}</div>
+        <div class="feed-time">${f.time}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════
+// SIMULATE LIVE PROCESSING
+// ══════════════════════════════════════
+function tickProcessing() {
+  queue.forEach(q => {
+    if (q.pct < 100) q.pct = Math.min(100, q.pct + Math.floor(Math.random() * 3));
+    if (q.pct >= 100) {
+      // Move to protected
+      const vid = videos.find(v => v.name + '.' + v.ext.toLowerCase() === q.name.toLowerCase() ||
+                                    v.name + '.' + v.ext === q.name);
+      if (vid) { vid.status = 'protected'; vid.progress = 100; }
+      // Add to feed
+      feed.unshift({ dot: 'green', text: `<strong>${q.name}</strong> successfully protected`, time: 'Just now' });
+    }
+  });
+  queue = queue.filter(q => q.pct < 100);
+  document.getElementById('statProc').textContent = queue.length || '0';
+  renderTable();
+  renderQueue();
+  renderFeed();
+}
+setInterval(tickProcessing, 4000);
+
+// ══════════════════════════════════════
+// UPLOAD MODAL
+// ══════════════════════════════════════
+let selectedFile = null;
+
+function openUploadModal() {
+  document.getElementById('uploadModal').classList.add('open');
+  resetUploadModal();
+}
+function closeUploadModal() {
+  document.getElementById('uploadModal').classList.remove('open');
+}
+function resetUploadModal() {
+  selectedFile = null;
+  document.getElementById('fileInput').value = '';
+  document.getElementById('mFileInfo').classList.remove('show');
+  document.getElementById('mProgFill').style.width = '0%';
+  document.getElementById('mSubmit').disabled = true;
+  document.getElementById('mSubmit').textContent = 'UPLOAD & PROTECT';
+  document.getElementById('mSubmit').style.background = '';
+}
+
+function fmtSize(b) {
+  if (!b) return '—';
+  const k=1024,u=['B','KB','MB','GB'];
+  const i=Math.floor(Math.log(b)/Math.log(k));
+  return (b/Math.pow(k,i)).toFixed(1)+' '+u[i];
+}
+
+function handleFileSelect(file) {
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['mp4','mov','avi','mkv'].includes(ext)) { alert('Unsupported format.'); return; }
+  selectedFile = file;
+  document.getElementById('mFileName').textContent = file.name;
+  document.getElementById('mFileSize').textContent = fmtSize(file.size);
+  document.getElementById('mFileInfo').classList.add('show');
+  document.getElementById('mSubmit').disabled = false;
+}
+
+document.getElementById('fileInput').addEventListener('change', e => {
+  if (e.target.files[0]) handleFileSelect(e.target.files[0]);
+});
+
+const mDrop = document.getElementById('mDrop');
+mDrop.addEventListener('dragover', e => { e.preventDefault(); mDrop.classList.add('drag-over'); });
+['dragleave','dragend'].forEach(ev => mDrop.addEventListener(ev, () => mDrop.classList.remove('drag-over')));
+mDrop.addEventListener('drop', e => { e.preventDefault(); mDrop.classList.remove('drag-over'); if(e.dataTransfer.files[0]) handleFileSelect(e.dataTransfer.files[0]); });
+
+function startUpload() {
+  if (!selectedFile) return;
+  const btn = document.getElementById('mSubmit');
+  const fill = document.getElementById('mProgFill');
+  btn.disabled = true;
+  btn.textContent = 'UPLOADING...';
+
+  // Simulate XHR upload progress
+  let pct = 0;
+  const interval = setInterval(() => {
+    pct += Math.floor(Math.random() * 12) + 4;
+    fill.style.width = Math.min(pct, 95) + '%';
+    if (pct >= 95) {
+      clearInterval(interval);
+      fill.style.width = '100%';
+      btn.textContent = 'QUEUING FOR PROCESSING...';
+      setTimeout(() => {
+        // Add to queue and video list
+        const name = selectedFile.name.split('.').slice(0,-1).join('.');
+        const ext  = selectedFile.name.split('.').pop().toLowerCase();
+        const newVid = { id: Date.now(), name, ext, date: 'Just now', size: fmtSize(selectedFile.size), status: 'processing', progress: 0 };
+        videos.unshift(newVid);
+        queue.push({ name: selectedFile.name, pct: 0, stage: 'Queued · starting soon', color: 'cyan' });
+        feed.unshift({ dot: 'cyan', text: `<strong>${selectedFile.name}</strong> uploaded, processing started`, time: 'Just now' });
+        document.getElementById('statVideos').textContent = videos.filter(v=>v.status==='protected').length;
+        document.getElementById('statProc').textContent = queue.length;
+        renderTable(); renderQueue(); renderFeed();
+        btn.textContent = '✓ QUEUED';
+        btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
+        setTimeout(closeUploadModal, 900);
+      }, 600);
+    }
+  }, 180);
+}
+
+// ══════════════════════════════════════
+// LOGOUT
+// ══════════════════════════════════════
+function openLogoutModal() { document.getElementById('logoutModal').classList.add('open'); }
+function closeLogoutModal() { document.getElementById('logoutModal').classList.remove('open'); }
+async function doLogout() {
+  sessionStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(SESSION_KEY);
+  try {
+    await fetch('/api/logout', { method: 'POST' });
+  } catch {}
+  window.location.href = '/login';
+}
+// ══════════════════════════════════════
+// SECTION SWITCHING (stub)
+// ══════════════════════════════════════
+function showSection(name) {
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+}
+
+// ══════════════════════════════════════
+// CANVAS BG
+// ══════════════════════════════════════
+(function(){
+  const c=document.getElementById('bgCanvas'),ctx=c.getContext('2d');
+  let W,H,pts=[];
+  function resize(){W=c.width=window.innerWidth;H=c.height=window.innerHeight;}
+  resize();window.addEventListener('resize',resize);
+  class P{constructor(){this.r()}r(){this.x=Math.random()*W;this.y=Math.random()*H;this.s=Math.random()*1.2+0.3;this.vx=(Math.random()-.5)*.25;this.vy=(Math.random()-.5)*.25;this.a=Math.random()*.35+0.06;}u(){this.x+=this.vx;this.y+=this.vy;if(this.x<0||this.x>W||this.y<0||this.y>H)this.r();}d(){ctx.beginPath();ctx.arc(this.x,this.y,this.s,0,Math.PI*2);ctx.fillStyle=`rgba(0,229,255,${this.a})`;ctx.fill();}}
+  for(let i=0;i<50;i++)pts.push(new P());
+  function loop(){ctx.clearRect(0,0,W,H);ctx.strokeStyle='rgba(0,229,255,0.025)';ctx.lineWidth=1;const sz=70;for(let x=0;x<W;x+=sz){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}for(let y=0;y<H;y+=sz){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}pts.forEach(p=>{p.u();p.d();});requestAnimationFrame(loop);}
+  loop();
+})();
+
+// ══════════════════════════════════════
+// CURSOR
+// ══════════════════════════════════════
+const cur=document.getElementById('cursor'),ring=document.getElementById('cursor-ring');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.left=mx+'px';cur.style.top=my+'px';});
+(function anim(){rx+=(mx-rx)*.12;ry+=(my-ry)*.12;ring.style.left=rx+'px';ring.style.top=ry+'px';requestAnimationFrame(anim);})();
+document.querySelectorAll('a,button,.sb-user,.upload-zone,.m-drop').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{ring.style.width='46px';ring.style.height='46px';ring.style.borderColor='rgba(0,229,255,0.75)';});
+  el.addEventListener('mouseleave',()=>{ring.style.width='32px';ring.style.height='32px';ring.style.borderColor='rgba(0,229,255,0.45)';});
+});
+
+// ══════════════════════════════════════
+// INIT
+// ══════════════════════════════════════
+
+checkAuth();
+loadDashboard();
+renderTable();
+renderQueue();
+renderFeed();
+</script>
+</body>
+</html>

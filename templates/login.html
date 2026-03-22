@@ -364,10 +364,19 @@ form.addEventListener('submit',async e=>{
   try{
     const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:username,password:pw})});
     const data=await res.json();
-    if(res.ok){
-      submitBtn.textContent='✓ SIGNED IN';
-      submitBtn.style.background='linear-gradient(135deg,#22c55e,#16a34a)';
-      setTimeout(()=>window.location.href=data.redirect||'index.html',700);
+    // ✅ REPLACE WITH
+if(res.ok){
+  const user = {
+    name: data.name || username,
+    email: data.email || username,
+    initials: (data.name || username).slice(0,2).toUpperCase(),
+    plan: data.plan || 'Free'
+  };
+  sessionStorage.setItem('shieldai_user', JSON.stringify(user));
+  submitBtn.textContent='✓ SIGNED IN';
+  submitBtn.style.background='linear-gradient(135deg,#22c55e,#16a34a)';
+  setTimeout(()=>window.location.href=data.redirect||'userDashboard.html',700);
+
     }else{
       alertMsg.textContent=data.message||'Invalid email or password.';
       alertEl.classList.add('show');
@@ -376,9 +385,16 @@ form.addEventListener('submit',async e=>{
     }
   }catch{
     /* demo fallback */
-    submitBtn.textContent='✓ SIGNED IN';
-    submitBtn.style.background='linear-gradient(135deg,#22c55e,#16a34a)';
-    setTimeout(()=>window.location.href='index.html',700);
+    const user = {
+    name: username,
+    email: username + '@example.com',
+    initials: username.slice(0,2).toUpperCase(),
+    plan: 'Free'
+  };
+  sessionStorage.setItem('shieldai_user', JSON.stringify(user));
+  submitBtn.textContent='✓ SIGNED IN';
+  submitBtn.style.background='linear-gradient(135deg,#22c55e,#16a34a)';
+  setTimeout(()=>window.location.href='userDashboard.html',700);
   }
 });
 </script>

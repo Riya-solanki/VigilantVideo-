@@ -466,10 +466,17 @@ form.addEventListener('submit',async e=>{
     const res=await fetch('/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:username,password:pw})});
     const data=await res.json();
     if(res.ok){
-      alertOk.classList.add('show');
-      submitBtn.textContent='✓ ACCOUNT CREATED';
-      submitBtn.style.background='linear-gradient(135deg,#22c55e,#16a34a)';
-      setTimeout(()=>window.location.href=data.redirect||'login.html',1200);
+      const user = {
+    name: data.name || username,
+    email: data.email || username,
+    initials: (data.name || username).slice(0,2).toUpperCase(),
+    plan: data.plan || 'Free'
+  };
+  sessionStorage.setItem('shieldai_user', JSON.stringify(user));
+  alertOk.classList.add('show');
+  submitBtn.textContent='✓ ACCOUNT CREATED';
+  submitBtn.style.background='linear-gradient(135deg,#22c55e,#16a34a)';
+  setTimeout(()=>window.location.href=data.redirect||'userDashboard.html',1200);
     }else{
       alertMsg.textContent=data.message||'Registration failed. Please try again.';
       alertErr.classList.add('show');
@@ -478,10 +485,17 @@ form.addEventListener('submit',async e=>{
     }
   }catch{
     /* demo fallback */
-    alertOk.classList.add('show');
-    submitBtn.textContent='✓ ACCOUNT CREATED';
-    submitBtn.style.background='linear-gradient(135deg,#22c55e,#16a34a)';
-    setTimeout(()=>window.location.href='login.html',1200);
+    const user = {
+    name: username,
+    email: username + '@example.com',
+    initials: username.slice(0,2).toUpperCase(),
+    plan: 'Free'
+  };
+  sessionStorage.setItem('shieldai_user', JSON.stringify(user));
+  alertOk.classList.add('show');
+  submitBtn.textContent='✓ ACCOUNT CREATED';
+  submitBtn.style.background='linear-gradient(135deg,#22c55e,#16a34a)';
+  setTimeout(()=>window.location.href='userDashboard.html',1200);
   }
 });
 </script>

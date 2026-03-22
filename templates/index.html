@@ -34,16 +34,16 @@
     </div>
     <span class="nav-logo-text">Vigilant<span>Video</span></span>
   </a>
-  <div class="nav-links"
+
+  <div class="nav-links">
     <a href="#dashboard">Dashboard</a>
     <a href="#about">About</a>
     <a href="#how">How It Works</a>
     <a href="#upload">Protect Video</a>
   </div>
-  <div class="nav-links">
-    <a href="{{ url_for('login') }}">Sign In</a>
-    <a href="{{ url_for('register') }}">Get Started</a>
-  </div>
+
+  <!-- Auth-aware CTA — filled instantly by the inline script below -->
+  <div class="nav-cta" id="navCta"></div>
 </nav>
 
 <!-- ══════════════════════════════════════
@@ -378,6 +378,7 @@
             <button class="btn-reset" id="resetBtn">Protect Another Video</button>
           </div>
         </div>
+
       </div>
     </div>
   </div>
@@ -414,6 +415,45 @@
 
 </div><!-- /.site -->
 
+<!-- ══════════════════════════════════════
+     AUTH-AWARE NAVBAR — runs before app.js
+     so buttons appear without any flicker
+══════════════════════════════════════ -->
+<script>
+(function () {
+  function getUser() {
+    try {
+      const raw = sessionStorage.getItem('shieldai_user') || localStorage.getItem('shieldai_user');
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  }
+
+  const user = getUser();
+  const cta  = document.getElementById('navCta');
+
+  if (user) {
+    // ── Logged in → show Dashboard + username badge
+    const initials = user.initials || (user.name ? user.name.slice(0, 2).toUpperCase() : 'U');
+    const name     = user.name || 'Account';
+    cta.innerHTML  = `
+      <a href="{{ url_for('dashboard') }}" class="btn-nav">My Dashboard</a>
+      <a href="{{ url_for('dashboard') }}" class="btn-nav primary" style="display:inline-flex;align-items:center;gap:0.5rem;text-decoration:none">
+        <span style="
+          display:inline-flex;align-items:center;justify-content:center;
+          width:22px;height:22px;border-radius:50%;
+          background:rgba(4,6,15,0.4);
+          font-size:0.62rem;font-weight:800;letter-spacing:0;
+        ">${initials}</span>
+        ${name}
+      </a>`;
+  } else {
+    // ── Not logged in → show Sign In + Get Started
+    cta.innerHTML = `
+      <a href="{{ url_for('login') }}"    class="btn-nav" style="text-decoration:none">Sign In</a>
+      <a href="{{ url_for('register') }}" class="btn-nav primary" style="text-decoration:none">Get Started</a>`;
+  }
+})();
+</script>
 
 <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
