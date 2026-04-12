@@ -49,7 +49,7 @@ class User(db.Model):
 
     def get_upload_limit(self):
         """Max uploads allowed per month based on plan."""
-        limit = UsageLimit.query.get(self.plan_tier)
+        limit = UsageLimit.query.get(self.subscription.plan)
         if limit:
             return limit.max_videos_per_month
         return 3   # default to free plan

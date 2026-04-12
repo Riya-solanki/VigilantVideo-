@@ -1,7 +1,7 @@
 """
 config.py — Vigilant Video — App Configuration
 Supports SQLite (dev) → Supabase PostgreSQL (prod) with one env var change.
-Cloudinary handles all video file storage (original + protected outputs).
+Cloudinary handles storage ONLY for the final protected video outputs.
 """
 
 import os
@@ -39,15 +39,14 @@ class Config:
 
     # Cloudinary folder structure inside your account:
     #   vigilant_video/
-    #       originals/   ← raw uploaded videos
-    #       protected/   ← processed + protected outputs
-    CLOUDINARY_FOLDER_ORIGINALS = 'vigilant_video/originals'
+    #       protected/   ← ONLY processed + protected outputs are stored in the cloud
     CLOUDINARY_FOLDER_PROTECTED = 'vigilant_video/protected'
 
     # ── File Uploads ───────────────────────────────────────────────────
-    # Flask accepts the file first, uploads to Cloudinary, then deletes local copy
+    # The new pipeline: Flask accepts the raw file locally → AI Worker processes it → 
+    # Uploads the shielded output to Cloudinary → Deletes all local copies instantly.
     MAX_CONTENT_LENGTH = 200 * 1024 * 1024   # 200 MB — matches free plan limit
-    UPLOAD_FOLDER      = os.environ.get('UPLOAD_FOLDER', 'uploads')  # temp only
+    UPLOAD_FOLDER      = os.environ.get('UPLOAD_FOLDER', 'uploads')  # strict temp directory
     ALLOWED_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv'}
 
     # ── Session ────────────────────────────────────────────────────────

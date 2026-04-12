@@ -3,21 +3,17 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Vigilant Video — AI Scraping Protection Platform</title>
+<meta name="description" content="VigilantVideo protects your video content from AI scraping with adversarial noise injection, metadata scrubbing, and cryptographic fingerprinting."/>
+<title>VigilantVideo — AI Video Protection Platform</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Figtree:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
 </head>
 <body>
 
-<!-- CURSOR -->
-<div id="cursor"></div>
-<div id="cursor-ring"></div>
-
-<!-- CANVAS BG -->
-<canvas id="bgCanvas"></canvas>
-<div class="grain"></div>
+<!-- Subtle gradient background -->
+<div class="bg-gradient"></div>
 
 <div class="site">
 
@@ -29,7 +25,7 @@
     <div class="nav-logo-icon">
       <svg viewBox="0 0 24 24" fill="none">
         <path d="M12 2L4 6V12C4 16.97 7.53 21.64 12 23C16.47 21.64 20 16.97 20 12V6L12 2Z" fill="white" opacity="0.9"/>
-        <path d="M9 12L11 14L15 10" stroke="#04060f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M9 12L11 14L15 10" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </div>
     <span class="nav-logo-text">Vigilant<span>Video</span></span>
@@ -42,7 +38,6 @@
     <a href="#upload">Protect Video</a>
   </div>
 
-  <!-- Auth-aware CTA — filled instantly by the inline script below -->
   <div class="nav-cta" id="navCta"></div>
 </nav>
 
@@ -50,22 +45,22 @@
      HERO
 ══════════════════════════════════════ -->
 <section class="hero">
-  <div class="hero-badge">🛡 AI Scraping Protection — v2.4</div>
+  <div class="hero-badge">AI Video Protection — v2.4</div>
   <h1 class="hero-title">
-    YOUR CONTENT.<br>
-    <span class="glow">UNSCRAPABLE.</span><br>
-    <span class="accent">FOREVER.</span>
+    Your Content.<br>
+    <span class="glow">Unscrapable.</span><br>
+    <span class="accent">Forever.</span>
   </h1>
-  <p class="hero-sub">Vigilant Video injects imperceptible adversarial noise into your videos, making them immune to AI training extraction while preserving perfect visual quality for human viewers.</p>
+  <p class="hero-sub">VigilantVideo injects imperceptible adversarial noise into your videos, making them immune to AI training extraction while preserving perfect visual quality for human viewers.</p>
   <div class="hero-actions">
-    <a href="#upload" class="btn-hero primary">
+    <a href="#upload" class="btn-hero primary" id="hero-protect-btn">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
         <path d="M12 3v12M6 9l6-6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         <rect x="3" y="19" width="18" height="2" rx="1" fill="currentColor"/>
       </svg>
       Protect My Video
     </a>
-    <a href="#about" class="btn-hero secondary">Learn How It Works →</a>
+    <a href="#about" class="btn-hero secondary" id="hero-learn-btn">Learn How It Works →</a>
   </div>
   <div class="hero-stats">
     <div class="stat-item"><div class="stat-num">98.7%</div><div class="stat-label">AI Block Rate</div></div>
@@ -73,6 +68,7 @@
     <div class="stat-item"><div class="stat-num">0ms</div><div class="stat-label">Visible Degradation</div></div>
     <div class="stat-item"><div class="stat-num">12s</div><div class="stat-label">Avg. Processing</div></div>
   </div>
+
   <!-- Floating cards -->
   <div class="hero-float f1">
     <div class="float-label">Active Shield</div>
@@ -92,32 +88,40 @@
 <section id="dashboard">
   <div class="dash-header">
     <div class="section-label">Dashboard</div>
-    <h2 class="section-title">PROTECTION OVERVIEW</h2>
+    <h2 class="section-title">Protection Overview</h2>
     <p class="section-sub">Real-time monitoring of your protected content library and AI scraping attempts.</p>
   </div>
 
   <!-- Stat cards -->
   <div class="dash-grid">
     <div class="dash-card">
-      <div class="dc-icon cyan">🛡</div>
+      <div class="dc-icon cyan">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2L4 6V12C4 16.97 7.53 21.64 12 23C16.47 21.64 20 16.97 20 12V6L12 2Z" stroke="currentColor" stroke-width="2"/></svg>
+      </div>
       <div class="dc-num">1,482</div>
       <div class="dc-label">Videos Protected</div>
       <div class="dc-change up">↑ +28 this week</div>
     </div>
     <div class="dash-card">
-      <div class="dc-icon red">🚫</div>
+      <div class="dc-icon red">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><path d="M15 9L9 15M9 9l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </div>
       <div class="dc-num">34,291</div>
       <div class="dc-label">Scraping Attempts Blocked</div>
       <div class="dc-change up">↑ +12% today</div>
     </div>
     <div class="dash-card">
-      <div class="dc-icon green">✔</div>
+      <div class="dc-icon green">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
       <div class="dc-num">99.1%</div>
       <div class="dc-label">Uptime this month</div>
       <div class="dc-change up">↑ Stable</div>
     </div>
     <div class="dash-card">
-      <div class="dc-icon amber">⚡</div>
+      <div class="dc-icon amber">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
       <div class="dc-num">11.4s</div>
       <div class="dc-label">Avg. Processing Time</div>
       <div class="dc-change down">↓ −2s vs last week</div>
@@ -128,17 +132,17 @@
   <div class="dash-coverage">
     <div class="chart-title" style="margin-bottom:1.25rem">Protection Coverage</div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem">
-      <div style="padding:1rem 1.25rem;border-radius:var(--r);background:var(--glass);border:1px solid var(--glass-border)">
-        <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:8px"><span style="color:var(--muted2)">Adversarial Noise</span><span style="color:var(--cyan);font-weight:700">94%</span></div>
-        <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden"><div style="width:94%;height:100%;background:linear-gradient(90deg,var(--cyan),var(--teal));border-radius:99px;box-shadow:0 0 8px var(--cyan-glow)"></div></div>
+      <div style="padding:1rem 1.25rem;border-radius:var(--radius);background:var(--bg-secondary);border:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:8px"><span style="color:var(--text-tertiary)">Adversarial Noise</span><span style="color:var(--accent-light);font-weight:700">94%</span></div>
+        <div style="height:4px;background:rgba(255,255,255,0.04);border-radius:99px;overflow:hidden"><div style="width:94%;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-light));border-radius:99px"></div></div>
       </div>
-      <div style="padding:1rem 1.25rem;border-radius:var(--r);background:var(--glass);border:1px solid var(--glass-border)">
-        <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:8px"><span style="color:var(--muted2)">Metadata Scrub</span><span style="color:var(--cyan);font-weight:700">100%</span></div>
-        <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden"><div style="width:100%;height:100%;background:linear-gradient(90deg,var(--cyan),var(--teal));border-radius:99px;box-shadow:0 0 8px var(--cyan-glow)"></div></div>
+      <div style="padding:1rem 1.25rem;border-radius:var(--radius);background:var(--bg-secondary);border:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:8px"><span style="color:var(--text-tertiary)">Metadata Scrub</span><span style="color:var(--accent-light);font-weight:700">100%</span></div>
+        <div style="height:4px;background:rgba(255,255,255,0.04);border-radius:99px;overflow:hidden"><div style="width:100%;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-light));border-radius:99px"></div></div>
       </div>
-      <div style="padding:1rem 1.25rem;border-radius:var(--r);background:var(--glass);border:1px solid var(--glass-border)">
-        <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:8px"><span style="color:var(--muted2)">Fingerprint Embed</span><span style="color:var(--cyan);font-weight:700">87%</span></div>
-        <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden"><div style="width:87%;height:100%;background:linear-gradient(90deg,var(--cyan),var(--teal));border-radius:99px;box-shadow:0 0 8px var(--cyan-glow)"></div></div>
+      <div style="padding:1rem 1.25rem;border-radius:var(--radius);background:var(--bg-secondary);border:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:8px"><span style="color:var(--text-tertiary)">Fingerprint Embed</span><span style="color:var(--accent-light);font-weight:700">87%</span></div>
+        <div style="height:4px;background:rgba(255,255,255,0.04);border-radius:99px;overflow:hidden"><div style="width:87%;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-light));border-radius:99px"></div></div>
       </div>
     </div>
   </div>
@@ -150,33 +154,41 @@
 <section id="about">
   <div class="about-grid">
     <div class="about-text">
-      <div class="section-label">About Vigilant Video</div>
-      <h2 class="section-title">BUILT TO PROTECT CREATORS</h2>
-      <p class="section-sub">Vigilant Video was built by a team passionate about creator rights — combining adversarial ML research with real-world tools so artists, filmmakers, and studios can share their work without fear.</p>
+      <div class="section-label">About VigilantVideo</div>
+      <h2 class="section-title">Built to Protect Creators</h2>
+      <p class="section-sub">VigilantVideo was built by a team passionate about creator rights — combining adversarial ML research with real-world tools so artists, filmmakers, and studios can share their work without fear.</p>
       <div class="about-features">
         <div class="feat-row">
-          <div class="feat-icon">🧠</div>
+          <div class="feat-icon">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 2a7 7 0 017 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 017-7z" stroke="currentColor" stroke-width="2"/><path d="M9 21h6M10 17h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </div>
           <div>
             <div class="feat-title">Adversarial ML Engine</div>
             <div class="feat-desc">Our proprietary FGSM-based algorithm generates imperceptible perturbations that confuse every major vision transformer and CNN architecture.</div>
           </div>
         </div>
         <div class="feat-row">
-          <div class="feat-icon">👁</div>
+          <div class="feat-icon">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg>
+          </div>
           <div>
             <div class="feat-title">Invisible to Humans</div>
             <div class="feat-desc">Noise is calibrated to stay below the human visual perception threshold — your audience sees your content exactly as intended.</div>
           </div>
         </div>
         <div class="feat-row">
-          <div class="feat-icon">🔏</div>
+          <div class="feat-icon">
+            <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="2"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </div>
           <div>
             <div class="feat-title">Cryptographic Fingerprinting</div>
             <div class="feat-desc">Every video gets a unique, invisible watermark that survives re-encoding, compression, and screen recording — trace leaks instantly.</div>
           </div>
         </div>
         <div class="feat-row">
-          <div class="feat-icon">⚡</div>
+          <div class="feat-icon">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
           <div>
             <div class="feat-title">GPU-Accelerated Processing</div>
             <div class="feat-desc">Our distributed GPU cluster processes a 1-hour 4K video in under 4 minutes. No waiting, no batch queues.</div>
@@ -184,15 +196,15 @@
         </div>
       </div>
       <div class="about-team">
-        <div class="team-chip"><div class="team-avatar" style="background:rgba(0,229,255,0.15);color:var(--cyan)">RD</div>Rakshan D</div>
-        <div class="team-chip"><div class="team-avatar" style="background:rgba(245,158,11,0.15);color:var(--amber)">RS</div>Riya Solanki</div>
-        <div class="team-chip"><div class="team-avatar" style="background:rgba(34,197,94,0.15);color:var(--green)">MM</div>Mugil M</div>
+        <div class="team-chip"><div class="team-avatar" style="background:var(--accent-subtle);color:var(--accent-light)">RD</div>Rakshan D</div>
+        <div class="team-chip"><div class="team-avatar" style="background:var(--warning-subtle);color:var(--warning)">RS</div>Riya Solanki</div>
+        <div class="team-chip"><div class="team-avatar" style="background:var(--success-subtle);color:var(--success)">MM</div>Mugil M</div>
       </div>
     </div>
 
     <div class="about-visual">
       <div class="av-card">
-        <div class="av-card-title">PROTECTION STACK</div>
+        <div class="av-card-title">Protection Stack</div>
         <div class="tech-stack">
           <div class="tech-row">
             <span class="tech-name">FGSM Perturbation</span>
@@ -225,17 +237,17 @@
             <span class="tech-pct">76%</span>
           </div>
         </div>
-        <div style="margin-top:2rem;padding:1.25rem;border-radius:10px;background:rgba(0,229,255,0.04);border:1px solid rgba(0,229,255,0.12)">
-          <div style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:0.75rem">Tested Against</div>
-          <div style="display:flex;flex-wrap:wrap;gap:0.5rem">
-            <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.05);font-size:0.72rem;color:var(--muted2)">Stable Diffusion</span>
-            <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.05);font-size:0.72rem;color:var(--muted2)">DALL-E 3</span>
-            <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.05);font-size:0.72rem;color:var(--muted2)">Sora</span>
-            <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.05);font-size:0.72rem;color:var(--muted2)">MidJourney</span>
-            <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.05);font-size:0.72rem;color:var(--muted2)">Gen-2</span>
-            <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.05);font-size:0.72rem;color:var(--muted2)">Pika</span>
-            <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.05);font-size:0.72rem;color:var(--muted2)">OpenCLIP</span>
-            <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.05);font-size:0.72rem;color:var(--muted2)">DINO v2</span>
+        <div style="margin-top:1.75rem;padding:1rem 1.25rem;border-radius:var(--radius-sm);background:var(--accent-subtle);border:1px solid var(--border-accent)">
+          <div style="font-size:0.72rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.625rem;font-weight:600">Tested Against</div>
+          <div style="display:flex;flex-wrap:wrap;gap:0.375rem">
+            <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.04);font-size:0.72rem;color:var(--text-secondary)">Stable Diffusion</span>
+            <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.04);font-size:0.72rem;color:var(--text-secondary)">DALL-E 3</span>
+            <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.04);font-size:0.72rem;color:var(--text-secondary)">Sora</span>
+            <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.04);font-size:0.72rem;color:var(--text-secondary)">MidJourney</span>
+            <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.04);font-size:0.72rem;color:var(--text-secondary)">Gen-2</span>
+            <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.04);font-size:0.72rem;color:var(--text-secondary)">Pika</span>
+            <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.04);font-size:0.72rem;color:var(--text-secondary)">OpenCLIP</span>
+            <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.04);font-size:0.72rem;color:var(--text-secondary)">DINO v2</span>
           </div>
         </div>
       </div>
@@ -247,27 +259,33 @@
      HOW IT WORKS
 ══════════════════════════════════════ -->
 <section id="how">
-  <div style="text-align:center;max-width:600px;margin:0 auto 0">
+  <div style="text-align:center;max-width:550px;margin:0 auto 0">
     <div class="section-label" style="justify-content:center">How It Works</div>
-    <h2 class="section-title">THREE STEPS TO FULL PROTECTION</h2>
+    <h2 class="section-title">Three Steps to Full Protection</h2>
   </div>
   <div class="steps-grid">
     <div class="step-card">
       <div class="step-num">01</div>
-      <div class="step-icon">📤</div>
-      <div class="step-title">UPLOAD YOUR VIDEO</div>
+      <div class="step-icon">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12M6 9l6-6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><rect x="3" y="19" width="18" height="2" rx="1" fill="currentColor"/></svg>
+      </div>
+      <div class="step-title">Upload Your Video</div>
       <p class="step-desc">Drag and drop your video file — MP4, AVI, MOV, or MKV up to 10 GB. All transfers are encrypted with TLS 1.3 and never stored longer than 24 hours.</p>
     </div>
     <div class="step-card">
       <div class="step-num">02</div>
-      <div class="step-icon">⚙️</div>
-      <div class="step-title">AI SHIELD APPLIED</div>
+      <div class="step-icon">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9c.26.604.852.997 1.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2"/></svg>
+      </div>
+      <div class="step-title">AI Shield Applied</div>
       <p class="step-desc">Our GPU cluster runs multi-layer adversarial noise injection, metadata purging, and cryptographic fingerprinting across every frame of your video in seconds.</p>
     </div>
     <div class="step-card">
       <div class="step-num">03</div>
-      <div class="step-icon">⬇️</div>
-      <div class="step-title">DOWNLOAD & PUBLISH</div>
+      <div class="step-icon">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 17V3M6 11l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><rect x="3" y="19" width="18" height="2" rx="1" fill="currentColor"/></svg>
+      </div>
+      <div class="step-title">Download & Publish</div>
       <p class="step-desc">Receive your protected video — visually identical but invisible to AI scrapers. Publish anywhere with confidence that your content cannot be used for AI training.</p>
     </div>
   </div>
@@ -280,7 +298,7 @@
   <div class="upload-layout">
     <div class="upload-left">
       <div class="section-label">Protect Now</div>
-      <h2 class="section-title">UPLOAD YOUR VIDEO</h2>
+      <h2 class="section-title">Upload Your Video</h2>
       <p class="section-sub">Upload once, receive a fully shielded video ready to share — with zero visible quality loss.</p>
       <div class="protection-list">
         <div class="prot-item">
@@ -321,14 +339,18 @@
         <!-- STATE: UPLOAD -->
         <div id="uploadState">
           <div class="drop-zone" id="dropZone">
-            <div class="dz-icon">📁</div>
+            <div class="dz-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
             <div class="dz-title">Drop your video here</div>
             <div class="dz-sub">MP4 · AVI · MOV · MKV</div>
             <button class="dz-btn" id="chooseBtn">Browse Files</button>
           </div>
           <div class="file-meta-box" id="fileMeta">
             <div class="fm-row">
-              <div class="fm-icon">🎬</div>
+              <div class="fm-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2z" stroke="currentColor" stroke-width="2"/><polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2"/></svg>
+              </div>
               <div>
                 <div class="fm-name" id="fName">—</div>
                 <div class="fm-size" id="fSize">—</div>
@@ -339,19 +361,19 @@
               <div class="prog-pct" id="progPct">0%</div>
             </div>
           </div>
-          <button class="submit-btn" id="uploadBtn" disabled>UPLOAD & PROTECT</button>
+          <button class="submit-btn" id="uploadBtn" disabled>Upload & Protect</button>
         </div>
 
         <!-- STATE: PROCESSING -->
         <div id="processingState" style="display:none;flex-direction:column;align-items:center;gap:1.25rem;padding:1rem 0">
           <div class="proc-ring">
-            <svg viewBox="0 0 80 80" fill="none">
-              <circle cx="40" cy="40" r="34" stroke="rgba(0,229,255,0.12)" stroke-width="4"/>
-              <circle cx="40" cy="40" r="34" stroke="url(#cg)" stroke-width="4" stroke-dasharray="60 154" stroke-linecap="round"/>
+            <svg viewBox="0 0 64 64" fill="none">
+              <circle cx="32" cy="32" r="28" stroke="rgba(99,102,241,0.12)" stroke-width="4"/>
+              <circle cx="32" cy="32" r="28" stroke="url(#pg)" stroke-width="4" stroke-dasharray="50 126" stroke-linecap="round"/>
               <defs>
-                <linearGradient id="cg" x1="40" y1="6" x2="40" y2="74" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stop-color="#00e5ff"/>
-                  <stop offset="100%" stop-color="#00b4d8"/>
+                <linearGradient id="pg" x1="32" y1="4" x2="32" y2="60" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#818cf8"/>
+                  <stop offset="100%" stop-color="#6366f1"/>
                 </linearGradient>
               </defs>
             </svg>
@@ -368,7 +390,7 @@
         <!-- STATE: DONE -->
         <div id="doneState" style="display:none;flex-direction:column;align-items:center;gap:1.25rem;padding:0.5rem 0;text-align:center">
           <div class="done-check">✓</div>
-          <div class="done-title">PROTECTION APPLIED</div>
+          <div class="done-title">Protection Applied</div>
           <div class="done-sub">Your video is now shielded against all known AI scraping methods. No visual quality was altered.</div>
           <div class="done-actions" style="width:100%">
             <a class="btn-download" id="dlBtn" href="#" download>
@@ -391,7 +413,7 @@
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1.5rem;margin-bottom:1.5rem">
     <a href="#" class="nav-logo" style="text-decoration:none">
       <div class="nav-logo-icon">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M12 2L4 6V12C4 16.97 7.53 21.64 12 23C16.47 21.64 20 16.97 20 12V6L12 2Z" fill="white" opacity="0.9"/><path d="M9 12L11 14L15 10" stroke="#04060f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 2L4 6V12C4 16.97 7.53 21.64 12 23C16.47 21.64 20 16.97 20 12V6L12 2Z" fill="white" opacity="0.9"/><path d="M9 12L11 14L15 10" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
       <span class="nav-logo-text">Vigilant<span>Video</span></span>
     </a>
@@ -416,8 +438,7 @@
 </div><!-- /.site -->
 
 <!-- ══════════════════════════════════════
-     AUTH-AWARE NAVBAR — runs before app.js
-     so buttons appear without any flicker
+     AUTH-AWARE NAVBAR
 ══════════════════════════════════════ -->
 <script>
 (function () {
@@ -432,7 +453,6 @@
   const cta  = document.getElementById('navCta');
 
   if (user) {
-    // ── Logged in → show Dashboard + username badge
     const initials = user.initials || (user.name ? user.name.slice(0, 2).toUpperCase() : 'U');
     const name     = user.name || 'Account';
     cta.innerHTML  = `
@@ -441,13 +461,12 @@
         <span style="
           display:inline-flex;align-items:center;justify-content:center;
           width:22px;height:22px;border-radius:50%;
-          background:rgba(4,6,15,0.4);
+          background:rgba(255,255,255,0.15);
           font-size:0.62rem;font-weight:800;letter-spacing:0;
         ">${initials}</span>
         ${name}
       </a>`;
   } else {
-    // ── Not logged in → show Sign In + Get Started
     cta.innerHTML = `
       <a href="{{ url_for('login') }}"    class="btn-nav" style="text-decoration:none">Sign In</a>
       <a href="{{ url_for('register') }}" class="btn-nav primary" style="text-decoration:none">Get Started</a>`;
