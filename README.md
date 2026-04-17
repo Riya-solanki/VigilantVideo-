@@ -1,4 +1,4 @@
-# 🎥 VideoVigilant – AI Content Protection System
+# 🎥 VigilantVideo – AI Content Protection System
 
 ## 🚀 Introduction
 
