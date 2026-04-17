@@ -20,8 +20,8 @@ from flask import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 
-# Note: Ensure you have a protection.py file with this function defined
-from protection import protect_video
+# Note: Ensure you have a protection_gpu_v2.py file with this function defined
+from protection_gpu_v2 import protect_video
 
 from config import config, init_cloudinary
 from models import (
