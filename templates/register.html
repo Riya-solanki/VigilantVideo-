@@ -398,7 +398,7 @@ form.addEventListener('submit',async e=>{
   alertOk.classList.add('show');
   submitBtn.textContent='✓ Account Created';
   submitBtn.style.background='#10b981';
-  setTimeout(()=>window.location.href=data.redirect||'userDashboard.html',1200);
+  setTimeout(()=>window.location.href=data.redirect||'/dashboard',1200);
     }else{
       alertMsg.textContent=data.message||'Registration failed. Please try again.';
       alertErr.classList.add('show');
@@ -406,18 +406,10 @@ form.addEventListener('submit',async e=>{
       submitBtn.disabled=false;
     }
   }catch{
-    /* demo fallback */
-    const user = {
-    name: username,
-    email: username + '@example.com',
-    initials: username.slice(0,2).toUpperCase(),
-    plan: 'Free'
-  };
-  sessionStorage.setItem('shieldai_user', JSON.stringify(user));
-  alertOk.classList.add('show');
-  submitBtn.textContent='✓ Account Created';
-  submitBtn.style.background='#10b981';
-  setTimeout(()=>window.location.href='userDashboard.html',1200);
+    alertMsg.textContent='Unable to reach server. Please try again.';
+    alertErr.classList.add('show');
+    submitBtn.textContent='Create Account';
+    submitBtn.disabled=false;
   }
 });
 </script>

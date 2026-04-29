@@ -301,7 +301,7 @@ if(res.ok){
   sessionStorage.setItem('shieldai_user', JSON.stringify(user));
   submitBtn.textContent='✓ Signed In';
   submitBtn.style.background='#10b981';
-  setTimeout(()=>window.location.href=data.redirect||'userDashboard.html',700);
+  setTimeout(()=>window.location.href=data.redirect||'/dashboard',700);
 
     }else{
       alertMsg.textContent=data.message||'Invalid email or password.';
@@ -310,17 +310,10 @@ if(res.ok){
       submitBtn.disabled=false;
     }
   }catch{
-    /* demo fallback */
-    const user = {
-    name: username,
-    email: username + '@example.com',
-    initials: username.slice(0,2).toUpperCase(),
-    plan: 'Free'
-  };
-  sessionStorage.setItem('shieldai_user', JSON.stringify(user));
-  submitBtn.textContent='✓ Signed In';
-  submitBtn.style.background='#10b981';
-  setTimeout(()=>window.location.href='userDashboard.html',700);
+    alertMsg.textContent='Unable to reach server. Please try again.';
+    alertEl.classList.add('show');
+    submitBtn.textContent='Sign In';
+    submitBtn.disabled=false;
   }
 });
 </script>

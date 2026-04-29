@@ -345,7 +345,7 @@ body{
 <div class="grain"></div>
 
 <!-- ══ AUTH GATE ══ -->
-<div id="authGate">
+<div id="authGate" class="hidden">
   <div class="gate-card">
     <div class="gate-icon">
       <svg viewBox="0 0 24 24" fill="none">
@@ -546,20 +546,9 @@ body{
 const SESSION_KEY = 'shieldai_user';
 
 function checkAuth() {
-  const user = getUser();
-  if (!user) {
-    document.getElementById('authGate').classList.remove('hidden');
-  } else {
-    document.getElementById('authGate').classList.add('hidden');
-    loadUserData(user);
-  }
-}
-
-function getUser() {
-  try {
-    const raw = sessionStorage.getItem(SESSION_KEY) || localStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+  // Server-side session is the source of truth.
+  // /api/dashboard handles redirects when unauthenticated.
+  document.getElementById('authGate').classList.add('hidden');
 }
 // ══════════════════════════════════════
 // SESSION KEY (keep this — don't change)

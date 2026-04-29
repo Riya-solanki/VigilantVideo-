@@ -79,13 +79,26 @@ def check_upload_limit(user):
 def home(): return render_template('index.html')
 
 @app.route('/login')
-def login(): return redirect(url_for('dashboard')) if session.get('user_id') else render_template('login.html')
+def login():
+    user = get_current_user()
+    if session.get('user_id') and not user:
+        session.clear()
+    return redirect(url_for('dashboard')) if user else render_template('login.html')
 
 @app.route('/register')
-def register(): return redirect(url_for('dashboard')) if session.get('user_id') else render_template('register.html')
+def register():
+    user = get_current_user()
+    if session.get('user_id') and not user:
+        session.clear()
+    return redirect(url_for('dashboard')) if user else render_template('register.html')
 
 @app.route('/dashboard')
-def dashboard(): return redirect(url_for('login')) if not session.get('user_id') else render_template('userDashboard.html')
+def dashboard():
+    user = get_current_user()
+    if not user:
+        session.clear()
+        return redirect(url_for('login'))
+    return render_template('userDashboard.html')
 
 # ══════════════════════════════════════════════════════════════════════
 # API — DASHBOARD DATA (REAL DATA FROM DB)
@@ -94,6 +107,9 @@ def dashboard(): return redirect(url_for('login')) if not session.get('user_id')
 @login_required_api
 def api_dashboard():
     user = get_current_user()
+    if not user:
+        session.clear()
+        return jsonify({'message': 'Authentication required.'}), 401
     
     # Fetch all user's jobs
     jobs = ProtectionJob.query.filter_by(user_id=user.id).order_by(ProtectionJob.created_at.desc()).all()
@@ -115,7 +131,7 @@ def api_dashboard():
     processing_count = len([v for v in videos if v['status'] in ['processing', 'pending', 'queued']])
     
     # Get download logs for activity feed
-    download_logs = DownloadLog.query.filter_by(user_id=user.id).order_by(DownloadLog.timestamp.desc()).limit(5).all()
+    download_logs = DownloadLog.query.filter_by(user_id=user.id).order_by(DownloadLog.downloaded_at.desc()).limit(5).all()
     
     # Get completed jobs for activity feed
     completed_jobs = ProtectionJob.query.filter_by(user_id=user.id, status='done').order_by(ProtectionJob.completed_at.desc()).limit(5).all()
@@ -222,7 +238,13 @@ def api_register():
         db.session.commit()
         
         session['user_id'] = user.id
-        return jsonify({'message': 'Account created successfully.', 'user_id': user.id}), 201
+        return jsonify({
+            'message': 'Account created successfully.',
+            'user_id': user.id,
+            'name': user.username,
+            'plan': 'free',
+            'redirect': '/dashboard',
+        }), 201
     except Exception as e:
         db.session.rollback()
         app.logger.error(f"Registration error: {e}")
@@ -242,7 +264,13 @@ def api_login():
         return jsonify({'message': 'Invalid credentials.'}), 401
     
     session['user_id'] = user.id
-    return jsonify({'message': 'Login successful.', 'user_id': user.id}), 200
+    return jsonify({
+        'message': 'Login successful.',
+        'user_id': user.id,
+        'name': user.username,
+        'plan': user.plan_tier if hasattr(user, 'plan_tier') else 'free',
+        'redirect': '/dashboard',
+    }), 200
 
 @app.route('/api/logout', methods=['POST'])
 def api_logout():
