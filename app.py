@@ -212,16 +212,21 @@ def api_register():
     if User.query.filter_by(username=username).first():
         return jsonify({'message': 'Username already exists.'}), 409
     
-    user = User(username=username, password_hash=generate_password_hash(password))
-    subscription = Subscription(plan='free')
-    user.subscription = subscription
-    
-    db.session.add(user)
-    db.session.add(subscription)
-    db.session.commit()
-    
-    session['user_id'] = user.id
-    return jsonify({'message': 'Account created successfully.', 'user_id': user.id}), 201
+    try:
+        user = User(username=username, password_hash=generate_password_hash(password))
+        subscription = Subscription(plan='free')
+        user.subscription = subscription
+        
+        db.session.add(user)
+        db.session.add(subscription)
+        db.session.commit()
+        
+        session['user_id'] = user.id
+        return jsonify({'message': 'Account created successfully.', 'user_id': user.id}), 201
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f"Registration error: {e}")
+        return jsonify({'message': f'Registration failed: {str(e)}'}), 500
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
