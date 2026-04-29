@@ -81,8 +81,168 @@ def home(): return render_template('index.html')
 @app.route('/login')
 def login(): return redirect(url_for('dashboard')) if session.get('user_id') else render_template('login.html')
 
+@app.route('/register')
+def register(): return redirect(url_for('dashboard')) if session.get('user_id') else render_template('register.html')
+
 @app.route('/dashboard')
 def dashboard(): return redirect(url_for('login')) if not session.get('user_id') else render_template('userDashboard.html')
+
+# ══════════════════════════════════════════════════════════════════════
+# API — DASHBOARD DATA (REAL DATA FROM DB)
+# ══════════════════════════════════════════════════════════════════════
+@app.route('/api/dashboard', methods=['GET'])
+@login_required_api
+def api_dashboard():
+    user = get_current_user()
+    
+    # Fetch all user's jobs
+    jobs = ProtectionJob.query.filter_by(user_id=user.id).order_by(ProtectionJob.created_at.desc()).all()
+    
+    # Build video list for frontend
+    videos = []
+    for job in jobs:
+        videos.append({
+            'name': job.original_filename.rsplit('.', 1)[0] if '.' in job.original_filename else job.original_filename,
+            'ext': job.original_filename.rsplit('.', 1)[-1].lower() if '.' in job.original_filename else 'mp4',
+            'date': job.created_at.strftime('%b %d, %Y') if job.created_at else 'Unknown',
+            'size': format_bytes(job.original_size_bytes) if job.original_size_bytes else '0 B',
+            'status': job.status,
+            'progress': 100 if job.status in ['done', 'protected'] else (50 if job.status == 'processing' else 0),
+        })
+    
+    # Calculate stats
+    protected_count = len([v for v in videos if v['status'] in ['done', 'protected']])
+    processing_count = len([v for v in videos if v['status'] in ['processing', 'pending', 'queued']])
+    
+    # Get download logs for activity feed
+    download_logs = DownloadLog.query.filter_by(user_id=user.id).order_by(DownloadLog.timestamp.desc()).limit(5).all()
+    
+    # Get completed jobs for activity feed
+    completed_jobs = ProtectionJob.query.filter_by(user_id=user.id, status='done').order_by(ProtectionJob.completed_at.desc()).limit(5).all()
+    
+    # Build activity feed
+    feed = []
+    
+    # Add completed jobs to feed
+    for job in completed_jobs:
+        if job.completed_at:
+            time_ago = get_time_ago(job.completed_at)
+            feed.append({
+                'dot': 'green',
+                'text': f"<strong>{job.original_filename}</strong> successfully protected",
+                'time': time_ago
+            })
+    
+    # Add download logs to feed
+    for log in download_logs:
+        time_ago = get_time_ago(log.downloaded_at) if hasattr(log, 'downloaded_at') else 'Unknown'
+        job = ProtectionJob.query.get(log.job_id)
+        filename = job.original_filename if job else 'Video'
+        feed.append({
+            'dot': 'cyan',
+            'text': f"<strong>{filename}</strong> downloaded",
+            'time': time_ago
+        })
+    
+    # Calculate storage
+    total_storage_bytes = sum(job.original_size_bytes or 0 for job in jobs)
+    storage_limit_bytes = 10 * 1024 * 1024 * 1024  # 10 GB default
+    
+    return jsonify({
+        'user': {
+            'username': user.username or 'User',
+            'initials': user.username[0].upper() if user.username else 'U'
+        },
+        'stats': {
+            'videos_protected': protected_count,
+            'processing_now': processing_count,
+            'scrape_attempts_blocked': 0,  # TODO: Implement scrape tracking
+            'storage_used_bytes': total_storage_bytes,
+            'storage_limit_bytes': storage_limit_bytes,
+        },
+        'videos': videos,
+        'feed': feed[:10]  # Limit feed to 10 items
+    }), 200
+
+# ══════════════════════════════════════════════════════════════════════
+# HELPERS
+# ══════════════════════════════════════════════════════════════════════
+def format_bytes(bytes_val):
+    if not bytes_val or bytes_val == 0:
+        return '0 B'
+    units = ['B', 'KB', 'MB', 'GB', 'TB']
+    i = 0
+    while bytes_val >= 1024 and i < len(units) - 1:
+        bytes_val /= 1024.0
+        i += 1
+    return f'{bytes_val:.1f} {units[i]}'
+
+def get_time_ago(dt):
+    if not dt:
+        return 'Unknown'
+    from datetime import datetime as dt_class
+    now = dt_class.utcnow()
+    diff = now - dt
+    
+    seconds = diff.total_seconds()
+    if seconds < 60:
+        return 'Just now'
+    elif seconds < 3600:
+        minutes = int(seconds / 60)
+        return f'{minutes}m ago'
+    elif seconds < 86400:
+        hours = int(seconds / 3600)
+        return f'{hours}h ago'
+    else:
+        days = int(seconds / 86400)
+        return f'{days}d ago'
+
+# ══════════════════════════════════════════════════════════════════════
+# API — ASYNC VIDEO UPLOAD (REDIS QUEUE)
+# ══════════════════════════════════════════════════════════════════════
+@app.route('/api/register', methods=['POST'])
+def api_register():
+    data = request.get_json() or {}
+    username = (data.get('username') or '').strip()
+    password = (data.get('password') or '').strip()
+    
+    if not username or not password:
+        return jsonify({'message': 'Username and password required.'}), 400
+    
+    if User.query.filter_by(username=username).first():
+        return jsonify({'message': 'Username already exists.'}), 409
+    
+    user = User(username=username, password_hash=generate_password_hash(password))
+    subscription = Subscription(plan='free')
+    user.subscription = subscription
+    
+    db.session.add(user)
+    db.session.add(subscription)
+    db.session.commit()
+    
+    session['user_id'] = user.id
+    return jsonify({'message': 'Account created successfully.', 'user_id': user.id}), 201
+
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    data = request.get_json() or {}
+    username = (data.get('username') or '').strip()
+    password = (data.get('password') or '').strip()
+    
+    if not username or not password:
+        return jsonify({'message': 'Username and password required.'}), 400
+    
+    user = User.query.filter_by(username=username).first()
+    if not user or not check_password_hash(user.password_hash, password):
+        return jsonify({'message': 'Invalid credentials.'}), 401
+    
+    session['user_id'] = user.id
+    return jsonify({'message': 'Login successful.', 'user_id': user.id}), 200
+
+@app.route('/api/logout', methods=['POST'])
+def api_logout():
+    session.clear()
+    return jsonify({'message': 'Logout successful.'}), 200
 
 # ══════════════════════════════════════════════════════════════════════
 # API — ASYNC VIDEO UPLOAD (REDIS QUEUE)
