@@ -409,7 +409,8 @@ def protect_video_gpu(
                 writer.write(frame)
         
         frame_count += len(batch_originals)
-        logger.info(f"Progress: {frame_count}/{total_frames} frames ({(frame_count/total_frames)*100:.1f}%)")
+        pct = (frame_count / total_frames * 100) if total_frames > 0 else 0
+        logger.info(f"Progress: {frame_count}/{total_frames} frames ({pct:.1f}%)")
 
     cap.release()
     if writer_process:
@@ -419,7 +420,8 @@ def protect_video_gpu(
         writer.release()
     
     # Layer 3: Metadata Poisoning
-    time.sleep(1) # Wait for file system sync before ffmpeg reads it
+    if not os.path.exists(temp_output) or os.path.getsize(temp_output) == 0:
+        raise RuntimeError("Temp output file missing or empty after writing.")
     logger.info("Injecting anti-AI metadata...")
     _inject_metadata(temp_output, input_path, output_path, watermark_text=kwargs.get('watermark_text', "VideoShield"))
     
@@ -429,12 +431,18 @@ def protect_video_gpu(
     
     elapsed = time.time() - start_time
     return {
-        "frames_processed": frame_count,
-        "duration_seconds": round(elapsed, 2),
-        "avg_lpips": round(sum(lpips_scores)/len(lpips_scores), 4) if lpips_scores else 0,
-        "fps": round(frame_count / elapsed, 2)
+    "frames_processed":          frame_count,
+    "duration_seconds":          round(elapsed, 2),
+    "avg_lpips":                 round(sum(lpips_scores)/len(lpips_scores), 4) if lpips_scores else 0,
+    "fps":                       round(frame_count / elapsed, 2),
+    "watermark_text":            kwargs.get('watermark_text', 'VideoShield'),
+    "watermark_strength":        kwargs.get('wm_strength', 0.1),
+    "noise_strength":            noise_strength,
+    "freq_perturbation_strength":kwargs.get('freq_strength', 0.02),
+    "protections_applied":       ["clip_drift", "freq_perturbation", "temporal", "dct_watermark", "metadata"],
+    "models_used":               ["clip-vit-base-patch32", "lpips-alex"],
     }
-
+    
 if __name__ == "__main__":
     import sys
     if len(sys.argv) < 3:

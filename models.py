@@ -21,7 +21,6 @@ class User(db.Model):
     username      = db.Column(db.String(80),  nullable=False, unique=True)
     password_hash = db.Column(db.String(256), nullable=False)
     is_active     = db.Column(db.Boolean,     default=True,  nullable=False)
-    plan_tier     = db.Column(db.String(20),  default='free', nullable=False)
     created_at    = db.Column(db.DateTime,    default=datetime.utcnow, nullable=False)
 
     # ── Relationships ──────────────────────────────────────────────
@@ -32,15 +31,14 @@ class User(db.Model):
 
     # ── Helper methods ─────────────────────────────────────────────
     def to_dict(self):
-        """Safe dict — never includes password_hash."""
         return {
             'id':         self.id,
             'username':   self.username,
-            'plan_tier':  self.plan_tier,
+            'plan_tier':  self.subscription.plan if self.subscription else 'free',  # ← single source
             'is_active':  self.is_active,
             'created_at': self.created_at.isoformat(),
             'initials':   self.username[:2].upper(),
-        }
+    }
 
     def get_monthly_uploads_used(self):
         """How many uploads this user has done this calendar month."""
@@ -48,14 +46,18 @@ class User(db.Model):
         return sub.monthly_uploads_used if sub else 0
 
     def get_upload_limit(self):
-        """Max uploads allowed per month based on plan."""
+        if not self.subscription:
+            return 3  # fallback to free
         limit = UsageLimit.query.get(self.subscription.plan)
-        if limit:
-            return limit.max_videos_per_month
-        return 3   # default to free plan
+        return limit.max_videos_per_month if limit else 3
 
     def __repr__(self):
-        return f'<User {self.username} [{self.plan_tier}]>'
+        plan = self.subscription.plan if self.subscription else 'free'
+        return f'<User {self.username} [{plan}]>'
+
+    @property
+    def plan_tier(self):
+        return self.subscription.plan if self.subscription else 'free'
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -116,7 +118,9 @@ class ProtectionJob(db.Model):
 # ══════════════════════════════════════════════════════════════════
 # TABLE 3: watermark_activations
 # Stores the full output of protect_video() from protection.py
-# ══════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════
+# 
+# ═════════
 class WatermarkActivation(db.Model):
     __tablename__ = 'watermark_activations'
 
@@ -238,10 +242,6 @@ class Subscription(db.Model):
     started_at           = db.Column(db.DateTime,   default=datetime.utcnow, nullable=False)
     expires_at           = db.Column(db.DateTime,   nullable=True)
 
-    def increment_upload(self):
-        """Call this every time a user successfully uploads a video."""
-        self.monthly_uploads_used += 1
-        db.session.commit()
 
     def reset_monthly_counter(self):
         """Call this on a monthly cron job to reset upload counts."""

@@ -8,7 +8,7 @@ _jpeg_q_table = None
 
 def _init_bases(device):
     global _dct_basis_8x8, _jpeg_q_table
-    if _dct_basis_8x8 is None or _dct_basis_8x8.device != device:
+    if _dct_basis_8x8 is None or _dct_basis_8x8.device.type != device.type:
         from scipy.fft import dct
         basis = np.zeros((8, 8))
         for i in range(8):
