@@ -395,23 +395,23 @@ body{
       <div class="stats-row">
         <div class="stat-card">
           <div class="sc-label">Total Videos Protected</div>
-          <div class="sc-val cyan" id="statVideos">24</div>
-          <div class="sc-sub up">+3 this week</div>
+          <div class="sc-val cyan" id="statVideos">0</div>
+          <div class="sc-sub up" id="statVideosChange">Loading...</div>
         </div>
         <div class="stat-card">
           <div class="sc-label">Processing Now</div>
-          <div class="sc-val amber" id="statProc">2</div>
-          <div class="sc-sub warn">est. 4 min remaining</div>
+          <div class="sc-val amber" id="statProc">0</div>
+          <div class="sc-sub warn" id="statProcSub">Loading...</div>
         </div>
         <div class="stat-card">
           <div class="sc-label">Scrape Attempts Blocked</div>
-          <div class="sc-val red" id="statBlocked">138</div>
-          <div class="sc-sub up">+12 today</div>
+          <div class="sc-val red" id="statBlocked">0</div>
+          <div class="sc-sub up" id="statBlockedSub">Loading...</div>
         </div>
         <div class="stat-card">
           <div class="sc-label">Storage Used</div>
-          <div class="sc-val green" id="statStorage">6.2 GB</div>
-          <div class="sc-sub">of 10 GB</div>
+          <div class="sc-val green" id="statStorage">0 B</div>
+          <div class="sc-sub" id="statStorageSub">of 10 GB</div>
         </div>
       </div>
 
@@ -599,6 +599,13 @@ async function loadDashboard() {
     document.getElementById('statVideos').textContent   = data.stats.videos_protected;
     document.getElementById('statProc').textContent     = data.stats.processing_now;
     document.getElementById('statBlocked').textContent  = data.stats.scrape_attempts_blocked;
+    document.getElementById('statStorage').textContent  = fmtBytes(data.stats.storage_used_bytes);
+    
+    // Update subtitles
+    document.getElementById('statVideosChange').textContent = data.stats.videos_protected === 0 ? 'No videos yet' : '+' + data.stats.videos_protected + ' total';
+    document.getElementById('statProcSub').textContent = data.stats.processing_now === 0 ? 'All caught up ✓' : 'Processing...';
+    document.getElementById('statBlockedSub').textContent = data.stats.scrape_attempts_blocked === 0 ? 'No threats detected' : '+' + data.stats.scrape_attempts_blocked + ' detected';
+    document.getElementById('statStorageSub').textContent = `of ${fmtBytes(data.stats.storage_limit_bytes)} used`;
 
     // ── Storage bar ─────────────────────────────────────
     const usedBytes  = data.stats.storage_used_bytes;
