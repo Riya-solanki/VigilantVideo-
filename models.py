@@ -20,6 +20,7 @@ class User(db.Model):
     id            = db.Column(db.Integer,     primary_key=True, autoincrement=True)
     username      = db.Column(db.String(80),  nullable=False, unique=True)
     password_hash = db.Column(db.String(256), nullable=False)
+    plan_tier     = db.Column(db.String(20),  default='free', nullable=False)
     is_active     = db.Column(db.Boolean,     default=True,  nullable=False)
     created_at    = db.Column(db.DateTime,    default=datetime.utcnow, nullable=False)
 
@@ -54,10 +55,6 @@ class User(db.Model):
     def __repr__(self):
         plan = self.subscription.plan if self.subscription else 'free'
         return f'<User {self.username} [{plan}]>'
-
-    @property
-    def plan_tier(self):
-        return self.subscription.plan if self.subscription else 'free'
 
 
 # ══════════════════════════════════════════════════════════════════

@@ -5,3 +5,5 @@ werkzeug>=3.0.0
 psycopg2-binary>=2.9.9
 cloudinary>=1.36.0
 gunicorn>=21.2.0
+boto3>=1.26.0
+redis>=4.5.0
