@@ -80,17 +80,13 @@ def home(): return render_template('index.html')
 
 @app.route('/login')
 def login():
-    user = get_current_user()
-    if session.get('user_id') and not user:
-        session.clear()
-    return redirect(url_for('dashboard')) if user else render_template('login.html')
+    session.clear()
+    return render_template('login.html')
 
 @app.route('/register')
 def register():
-    user = get_current_user()
-    if session.get('user_id') and not user:
-        session.clear()
-    return redirect(url_for('dashboard')) if user else render_template('register.html')
+    session.clear()
+    return render_template('register.html')
 
 @app.route('/dashboard')
 def dashboard():
@@ -270,6 +266,20 @@ def api_login():
         'name': user.username,
         'plan': user.plan_tier if hasattr(user, 'plan_tier') else 'free',
         'redirect': '/dashboard',
+    }), 200
+
+@app.route('/api/session', methods=['GET'])
+def api_session():
+    user = get_current_user()
+    if not user:
+        return jsonify({'authenticated': False}), 200
+    return jsonify({
+        'authenticated': True,
+        'user': {
+            'name': user.username,
+            'initials': user.username[:2].upper() if user.username else 'U',
+            'plan': user.plan_tier if hasattr(user, 'plan_tier') else 'free',
+        }
     }), 200
 
 @app.route('/api/logout', methods=['POST'])

@@ -441,36 +441,37 @@
      AUTH-AWARE NAVBAR
 ══════════════════════════════════════ -->
 <script>
-(function () {
-  function getUser() {
-    try {
-      const raw = sessionStorage.getItem('shieldai_user') || localStorage.getItem('shieldai_user');
-      return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
-  }
+(async function () {
+  const cta = document.getElementById('navCta');
+  if (!cta) return;
 
-  const user = getUser();
-  const cta  = document.getElementById('navCta');
+  try {
+    const res = await fetch('/api/session', { cache: 'no-store' });
+    const data = await res.json();
 
-  if (user) {
-    const initials = user.initials || (user.name ? user.name.slice(0, 2).toUpperCase() : 'U');
-    const name     = user.name || 'Account';
-    cta.innerHTML  = `
-      <a href="{{ url_for('dashboard') }}" class="btn-nav">My Dashboard</a>
-      <a href="{{ url_for('dashboard') }}" class="btn-nav primary" style="display:inline-flex;align-items:center;gap:0.5rem;text-decoration:none">
-        <span style="
-          display:inline-flex;align-items:center;justify-content:center;
-          width:22px;height:22px;border-radius:50%;
-          background:rgba(255,255,255,0.15);
-          font-size:0.62rem;font-weight:800;letter-spacing:0;
-        ">${initials}</span>
-        ${name}
-      </a>`;
-  } else {
-    cta.innerHTML = `
-      <a href="{{ url_for('login') }}"    class="btn-nav" style="text-decoration:none">Sign In</a>
-      <a href="{{ url_for('register') }}" class="btn-nav primary" style="text-decoration:none">Get Started</a>`;
-  }
+    if (res.ok && data.authenticated && data.user) {
+      const initials = data.user.initials || (data.user.name ? data.user.name.slice(0, 2).toUpperCase() : 'U');
+      const name = data.user.name || 'Account';
+      cta.innerHTML = `
+        <a href="{{ url_for('dashboard') }}" class="btn-nav">My Dashboard</a>
+        <a href="{{ url_for('dashboard') }}" class="btn-nav primary" style="display:inline-flex;align-items:center;gap:0.5rem;text-decoration:none">
+          <span style="
+            display:inline-flex;align-items:center;justify-content:center;
+            width:22px;height:22px;border-radius:50%;
+            background:rgba(255,255,255,0.15);
+            font-size:0.62rem;font-weight:800;letter-spacing:0;
+          ">${initials}</span>
+          ${name}
+        </a>`;
+      return;
+    }
+  } catch {}
+
+  sessionStorage.removeItem('shieldai_user');
+  localStorage.removeItem('shieldai_user');
+  cta.innerHTML = `
+    <a href="{{ url_for('login') }}" class="btn-nav" style="text-decoration:none">Sign In</a>
+    <a href="{{ url_for('register') }}" class="btn-nav primary" style="text-decoration:none">Get Started</a>`;
 })();
 </script>
 
