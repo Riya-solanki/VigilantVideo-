@@ -27,6 +27,8 @@ def create_app(env=None):
     env = env or os.environ.get('FLASK_ENV', 'default')
     app.config.from_object(config[env])
     db.init_app(app)
+    with app.app_context():
+        db.create_all()   # Create tables on startup if they don't exist
     return app
 
 app = create_app()
@@ -87,6 +89,9 @@ def login():
 def register():
     session.clear()
     return render_template('register.html')
+
+@app.route('/register')
+def register(): return redirect(url_for('dashboard')) if session.get('user_id') else render_template('login.html')
 
 @app.route('/dashboard')
 def dashboard():
@@ -288,6 +293,145 @@ def api_logout():
     return jsonify({'message': 'Logout successful.'}), 200
 
 # ══════════════════════════════════════════════════════════════════════
+# API — AUTH (LOGIN / REGISTER / LOGOUT / ME)
+# ══════════════════════════════════════════════════════════════════════
+@app.route('/api/auth/login', methods=['POST'])
+def api_login():
+    data     = request.get_json(silent=True) or {}
+    username = (data.get('username') or '').strip()
+    password = data.get('password') or ''
+    if not username or not password:
+        return jsonify({'message': 'Username and password are required.'}), 400
+    user = User.query.filter_by(username=username).first()
+    if not user or not check_password_hash(user.password_hash, password):
+        return jsonify({'message': 'Invalid username or password.'}), 401
+    session['user_id'] = user.id
+    return jsonify({'message': 'Logged in.', 'user': user.to_dict()}), 200
+
+@app.route('/api/auth/register', methods=['POST'])
+def api_register():
+    data     = request.get_json(silent=True) or {}
+    username = (data.get('username') or '').strip()
+    password = data.get('password') or ''
+    if not username or not password:
+        return jsonify({'message': 'Username and password are required.'}), 400
+    if len(password) < 6:
+        return jsonify({'message': 'Password must be at least 6 characters.'}), 400
+    if User.query.filter_by(username=username).first():
+        return jsonify({'message': 'Username already taken.'}), 409
+    user = User(username=username, password_hash=generate_password_hash(password))
+    db.session.add(user)
+    db.session.flush()  # get user.id before commit
+    sub  = Subscription(user_id=user.id, plan='free')
+    db.session.add(sub)
+    db.session.commit()
+    session['user_id'] = user.id
+    return jsonify({'message': 'Account created.', 'user': user.to_dict()}), 201
+
+@app.route('/api/logout', methods=['POST'])
+def api_logout():
+    session.clear()
+    return jsonify({'message': 'Logged out.'}), 200
+
+@app.route('/api/me', methods=['GET'])
+def api_me():
+    user = get_current_user()
+    if not user:
+        return jsonify({'message': 'Not authenticated.'}), 401
+    return jsonify({'user': user.to_dict()}), 200
+
+# ══════════════════════════════════════════════════════════════════════
+# API — DASHBOARD DATA (single endpoint, everything in one call)
+# ══════════════════════════════════════════════════════════════════════
+@app.route('/api/dashboard', methods=['GET'])
+@login_required_api
+def api_dashboard():
+    user = get_current_user()
+
+    # ── All jobs for this user (newest first) ──────────────────────
+    jobs = ProtectionJob.query.filter_by(user_id=user.id)\
+               .order_by(ProtectionJob.created_at.desc()).all()
+
+    # ── Stats ──────────────────────────────────────────────────────
+    videos_protected  = sum(1 for j in jobs if j.status == 'done')
+    processing_now    = sum(1 for j in jobs if j.status in ('pending', 'processing'))
+    storage_used      = sum(j.original_size_bytes or 0 for j in jobs)
+
+    # Storage limit from UsageLimit table (default 10 GB for free)
+    limit_row = UsageLimit.query.get(user.plan_tier)
+    storage_limit = (limit_row.max_file_size_bytes
+                     if limit_row and limit_row.max_file_size_bytes != -1
+                     else 10 * 1024 ** 3)  # 10 GB default
+    uploads_limit = (limit_row.max_videos_per_month
+                     if limit_row else 3)
+    uploads_used  = user.subscription.monthly_uploads_used if user.subscription else 0
+
+    # ── Video rows for the library table ──────────────────────────
+    def _job_to_video(j):
+        fname = j.original_filename or ''
+        parts = fname.rsplit('.', 1)
+        name  = parts[0] if len(parts) == 2 else fname
+        ext   = parts[1].lower() if len(parts) == 2 else ''
+        return {
+            'job_id': j.job_id,
+            'name':   name,
+            'ext':    ext,
+            'date':   j.created_at.strftime('%d %b %Y') if hasattr(j.created_at, 'strftime') else str(j.created_at)[:10],
+            'size':   j.size_display(),
+            'status': 'done' if j.status == 'done' else j.status,  # done→download ready
+        }
+
+    videos = [_job_to_video(j) for j in jobs]
+
+    # ── Activity feed (recent completions + downloads) ─────────────
+    feed = []
+    for j in jobs[:10]:  # cap at 10 entries
+        if j.status == 'done' and j.completed_at:
+            feed.append({
+                'dot':  'green',
+                'text': f'<strong>{j.original_filename}</strong> successfully protected',
+                'time': _time_ago(j.completed_at),
+            })
+        elif j.status == 'error':
+            feed.append({
+                'dot':  'red',
+                'text': f'<strong>{j.original_filename}</strong> protection failed',
+                'time': _time_ago(j.created_at),
+            })
+        elif j.status in ('pending', 'processing'):
+            feed.append({
+                'dot':  'amber',
+                'text': f'<strong>{j.original_filename}</strong> is being processed',
+                'time': _time_ago(j.created_at),
+            })
+
+    return jsonify({
+        'user': user.to_dict(),
+        'stats': {
+            'videos_protected':        videos_protected,
+            'processing_now':          processing_now,
+            'scrape_attempts_blocked': 0,  # placeholder — no detection table yet
+            'storage_used_bytes':      storage_used,
+            'storage_limit_bytes':     storage_limit,
+            'uploads_used':            uploads_used,
+            'uploads_limit':           uploads_limit,
+        },
+        'videos': videos,
+        'feed':   feed,
+    }), 200
+
+def _time_ago(dt):
+    """Return a human-readable 'X ago' string for a datetime."""
+    if not dt:
+        return ''
+    diff = datetime.utcnow() - dt
+    secs = int(diff.total_seconds())
+    if secs < 60:    return 'Just now'
+    if secs < 3600:  return f'{secs // 60} min ago'
+    if secs < 86400: return f'{secs // 3600} hr ago'
+    return f'{secs // 86400} days ago'
+
+# ══════════════════════════════════════════════════════════════════════
 # API — ASYNC VIDEO UPLOAD (REDIS QUEUE)
 # ══════════════════════════════════════════════════════════════════════
 @app.route('/api/upload', methods=['POST'])
@@ -342,7 +486,9 @@ def api_upload():
             "task_id": job_id,
             "raw_object": raw_r2_key,
             "protected_object": protected_r2_key,
-            "webhook_url": f"{request.url_root}api/internal/webhook",
+            #"webhook_url": f"{request.url_root}api/internal/webhook",
+            # Replace 'a1b2-c3d4' with your actual Ngrok forwarding address
+            "webhook_url": " https://4cb5-61-12-82-214.ngrok-free.app/api/internal/webhook",
             "webhook_secret": current_app.config['WEBHOOK_SECRET']
         }
         r.rpush("vigilant_video_queue", json.dumps(task_data))

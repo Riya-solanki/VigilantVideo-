@@ -12,14 +12,10 @@
 </head>
 <body>
 
-<!-- Subtle gradient background -->
 <div class="bg-gradient"></div>
 
 <div class="site">
 
-<!-- ══════════════════════════════════════
-     NAVBAR
-══════════════════════════════════════ -->
 <nav id="navbar">
   <a href="#" class="nav-logo">
     <div class="nav-logo-icon">
@@ -32,18 +28,26 @@
   </a>
 
   <div class="nav-links">
-    <a href="#dashboard">Dashboard</a>
+    <a href="{{ url_for('dashboard') }}">Dashboard</a>
     <a href="#about">About</a>
     <a href="#how">How It Works</a>
     <a href="#upload">Protect Video</a>
   </div>
 
-  <div class="nav-cta" id="navCta"></div>
+  <div class="nav-cta" id="navCta">
+    {% if session.get('user_id') %}
+      <a href="{{ url_for('dashboard') }}" class="btn-nav">My Dashboard</a>
+      <a href="{{ url_for('dashboard') }}" class="btn-nav primary" style="display:inline-flex;align-items:center;gap:0.5rem;text-decoration:none">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,0.15);font-size:0.62rem;font-weight:800;">👤</span>
+        Account
+      </a>
+    {% else %}
+      <a href="{{ url_for('login') }}" class="btn-nav" style="text-decoration:none">Sign In</a>
+      <a href="{{ url_for('register') }}" class="btn-nav primary" style="text-decoration:none">Get Started</a>
+    {% endif %}
+  </div>
 </nav>
 
-<!-- ══════════════════════════════════════
-     HERO
-══════════════════════════════════════ -->
 <section class="hero">
   <div class="hero-badge">AI Video Protection — v2.4</div>
   <h1 class="hero-title">
@@ -69,7 +73,6 @@
     <div class="stat-item"><div class="stat-num">12s</div><div class="stat-label">Avg. Processing</div></div>
   </div>
 
-  <!-- Floating cards -->
   <div class="hero-float f1">
     <div class="float-label">Active Shield</div>
     <div class="float-val">1,482 videos</div>
@@ -82,17 +85,13 @@
   </div>
 </section>
 
-<!-- ══════════════════════════════════════
-     DASHBOARD
-══════════════════════════════════════ -->
-<section id="dashboard">
+<section id="dashboard-preview">
   <div class="dash-header">
     <div class="section-label">Dashboard</div>
     <h2 class="section-title">Protection Overview</h2>
     <p class="section-sub">Real-time monitoring of your protected content library and AI scraping attempts.</p>
   </div>
 
-  <!-- Stat cards -->
   <div class="dash-grid">
     <div class="dash-card">
       <div class="dc-icon cyan">
@@ -128,7 +127,6 @@
     </div>
   </div>
 
-  <!-- Protection Coverage -->
   <div class="dash-coverage">
     <div class="chart-title" style="margin-bottom:1.25rem">Protection Coverage</div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem">
@@ -148,9 +146,6 @@
   </div>
 </section>
 
-<!-- ══════════════════════════════════════
-     ABOUT
-══════════════════════════════════════ -->
 <section id="about">
   <div class="about-grid">
     <div class="about-text">
@@ -255,9 +250,6 @@
   </div>
 </section>
 
-<!-- ══════════════════════════════════════
-     HOW IT WORKS
-══════════════════════════════════════ -->
 <section id="how">
   <div style="text-align:center;max-width:550px;margin:0 auto 0">
     <div class="section-label" style="justify-content:center">How It Works</div>
@@ -291,124 +283,24 @@
   </div>
 </section>
 
-<!-- ══════════════════════════════════════
-     UPLOAD
-══════════════════════════════════════ -->
 <section id="upload">
   <div class="upload-layout">
     <div class="upload-left">
       <div class="section-label">Protect Now</div>
-      <h2 class="section-title">Upload Your Video</h2>
-      <p class="section-sub">Upload once, receive a fully shielded video ready to share — with zero visible quality loss.</p>
-      <div class="protection-list">
-        <div class="prot-item">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          Adversarial noise injection across all frames
-        </div>
-        <div class="prot-item">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          Full EXIF and metadata scrubbing
-        </div>
-        <div class="prot-item">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          Cryptographic ownership fingerprint embedded
-        </div>
-        <div class="prot-item">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          Zero visible quality degradation guaranteed
-        </div>
-        <div class="prot-item">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          Files auto-deleted from servers after 24 hrs
-        </div>
-        <div class="prot-item">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          Supports MP4 · AVI · MOV · MKV up to 10 GB
-        </div>
-      </div>
-    </div>
-
-    <div class="upload-card">
-      <div class="uc-header">
-        <span class="uc-title">Video Protection Console</span>
-        <span class="uc-dot"></span>
-      </div>
-      <div class="uc-body">
-        <input type="file" id="fileInput" accept=".mp4,.avi,.mov,.mkv" style="display:none"/>
-
-        <!-- STATE: UPLOAD -->
-        <div id="uploadState">
-          <div class="drop-zone" id="dropZone">
-            <div class="dz-icon">
-              <svg viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </div>
-            <div class="dz-title">Drop your video here</div>
-            <div class="dz-sub">MP4 · AVI · MOV · MKV</div>
-            <button class="dz-btn" id="chooseBtn">Browse Files</button>
-          </div>
-          <div class="file-meta-box" id="fileMeta">
-            <div class="fm-row">
-              <div class="fm-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2z" stroke="currentColor" stroke-width="2"/><polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2"/></svg>
-              </div>
-              <div>
-                <div class="fm-name" id="fName">—</div>
-                <div class="fm-size" id="fSize">—</div>
-              </div>
-            </div>
-            <div class="prog-wrap" id="progWrap" style="display:none">
-              <div class="prog-track"><div class="prog-fill" id="progFill"></div></div>
-              <div class="prog-pct" id="progPct">0%</div>
-            </div>
-          </div>
-          <button class="submit-btn" id="uploadBtn" disabled>Upload & Protect</button>
-        </div>
-
-        <!-- STATE: PROCESSING -->
-        <div id="processingState" style="display:none;flex-direction:column;align-items:center;gap:1.25rem;padding:1rem 0">
-          <div class="proc-ring">
-            <svg viewBox="0 0 64 64" fill="none">
-              <circle cx="32" cy="32" r="28" stroke="rgba(99,102,241,0.12)" stroke-width="4"/>
-              <circle cx="32" cy="32" r="28" stroke="url(#pg)" stroke-width="4" stroke-dasharray="50 126" stroke-linecap="round"/>
-              <defs>
-                <linearGradient id="pg" x1="32" y1="4" x2="32" y2="60" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stop-color="#818cf8"/>
-                  <stop offset="100%" stop-color="#6366f1"/>
-                </linearGradient>
-              </defs>
-            </svg>
-          </div>
-          <div class="proc-status" id="procStatus">Analyzing video structure...</div>
-          <div class="stage-list">
-            <div class="stage-item" id="s1"><span class="s-dot"></span>Adversarial noise injection</div>
-            <div class="stage-item" id="s2"><span class="s-dot"></span>Metadata scrubbing</div>
-            <div class="stage-item" id="s3"><span class="s-dot"></span>Fingerprint embedding</div>
-            <div class="stage-item" id="s4"><span class="s-dot"></span>Final encoding pass</div>
-          </div>
-        </div>
-
-        <!-- STATE: DONE -->
-        <div id="doneState" style="display:none;flex-direction:column;align-items:center;gap:1.25rem;padding:0.5rem 0;text-align:center">
-          <div class="done-check">✓</div>
-          <div class="done-title">Protection Applied</div>
-          <div class="done-sub">Your video is now shielded against all known AI scraping methods. No visual quality was altered.</div>
-          <div class="done-actions" style="width:100%">
-            <a class="btn-download" id="dlBtn" href="#" download>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 4v12M6 14l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-              Download Protected Video
-            </a>
-            <button class="btn-reset" id="resetBtn">Protect Another Video</button>
-          </div>
-        </div>
-
+      <h2 class="section-title">Ready to shield your work?</h2>
+      <p class="section-sub">Sign in to your dashboard to securely upload your video and begin the adversarial noise injection process.</p>
+      
+      <div style="margin-top:2rem;">
+        {% if session.get('user_id') %}
+          <a href="{{ url_for('dashboard') }}" class="btn-hero primary" style="text-decoration:none;">Go to Dashboard to Upload</a>
+        {% else %}
+          <a href="{{ url_for('register') }}" class="btn-hero primary" style="text-decoration:none;">Create Free Account</a>
+        {% endif %}
       </div>
     </div>
   </div>
 </section>
 
-<!-- ══════════════════════════════════════
-     FOOTER
-══════════════════════════════════════ -->
 <footer>
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1.5rem;margin-bottom:1.5rem">
     <a href="#" class="nav-logo" style="text-decoration:none">
@@ -418,7 +310,7 @@
       <span class="nav-logo-text">Vigilant<span>Video</span></span>
     </a>
     <div style="display:flex;gap:2rem;flex-wrap:wrap">
-      <a href="#dashboard" class="footer-nav-link">Dashboard</a>
+      <a href="{{ url_for('dashboard') }}" class="footer-nav-link">Dashboard</a>
       <a href="#about" class="footer-nav-link">About</a>
       <a href="#how" class="footer-nav-link">How It Works</a>
       <a href="#upload" class="footer-nav-link">Protect Video</a>
@@ -435,46 +327,6 @@
   </div>
 </footer>
 
-</div><!-- /.site -->
-
-<!-- ══════════════════════════════════════
-     AUTH-AWARE NAVBAR
-══════════════════════════════════════ -->
-<script>
-(async function () {
-  const cta = document.getElementById('navCta');
-  if (!cta) return;
-
-  try {
-    const res = await fetch('/api/session', { cache: 'no-store' });
-    const data = await res.json();
-
-    if (res.ok && data.authenticated && data.user) {
-      const initials = data.user.initials || (data.user.name ? data.user.name.slice(0, 2).toUpperCase() : 'U');
-      const name = data.user.name || 'Account';
-      cta.innerHTML = `
-        <a href="{{ url_for('dashboard') }}" class="btn-nav">My Dashboard</a>
-        <a href="{{ url_for('dashboard') }}" class="btn-nav primary" style="display:inline-flex;align-items:center;gap:0.5rem;text-decoration:none">
-          <span style="
-            display:inline-flex;align-items:center;justify-content:center;
-            width:22px;height:22px;border-radius:50%;
-            background:rgba(255,255,255,0.15);
-            font-size:0.62rem;font-weight:800;letter-spacing:0;
-          ">${initials}</span>
-          ${name}
-        </a>`;
-      return;
-    }
-  } catch {}
-
-  sessionStorage.removeItem('shieldai_user');
-  localStorage.removeItem('shieldai_user');
-  cta.innerHTML = `
-    <a href="{{ url_for('login') }}" class="btn-nav" style="text-decoration:none">Sign In</a>
-    <a href="{{ url_for('register') }}" class="btn-nav primary" style="text-decoration:none">Get Started</a>`;
-})();
-</script>
-
-<script src="{{ url_for('static', filename='app.js') }}"></script>
+</div><script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

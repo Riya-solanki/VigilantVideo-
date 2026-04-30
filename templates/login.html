@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -156,7 +156,6 @@ body{
 
 <div class="page">
 
-  <!-- LEFT -->
   <div class="left-panel">
     <div>
       <a href="{{ url_for('home') }}" class="logo">
@@ -189,7 +188,6 @@ body{
     </div>
   </div>
 
-  <!-- RIGHT -->
   <div class="right-panel">
     <div class="form-card">
 
@@ -199,13 +197,12 @@ body{
   No account yet?
   <a href="{{ url_for('register') }}">Create one free →</a>
 </div>
-      <div class="alert alert-err" id="alertErr"><span>⚠</span><span id="alertMsg">Invalid credentials.</span></div>
+      <div class="alert alert-err" id="alertErr"><span>⚠️</span><span id="alertMsg">Invalid credentials.</span></div>
 
       <form id="loginForm" novalidate>
         <div class="fields">
 
-          <!-- Username -->
-           <div class="field">
+          <div class="field">
             <label class="f-label" for="username">Username</label>
             <div class="f-wrap">
                 <span class="f-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/></svg></span>
@@ -214,7 +211,6 @@ body{
             <div class="f-err" id="userErr">Username is required.</div>
         </div>
 
-          <!-- Password -->
           <div class="field">
             <label class="f-label" for="password">Password</label>
             <div class="f-wrap">
@@ -225,7 +221,6 @@ body{
             <div class="f-err" id="passErr">Password is required.</div>
           </div>
 
-          <!-- Options -->
           <div class="opt-row">
             <label class="check-wrap">
               <input type="checkbox" id="remember"/>
@@ -235,7 +230,6 @@ body{
             <a href="#" class="link-sm">Forgot password?</a>
           </div>
 
-          <!-- Submit -->
           <button type="submit" class="btn-submit" id="submitBtn">Sign In</button>
 
         </div>
@@ -247,73 +241,99 @@ body{
 
 <script>
 /* ── PWD TOGGLE ── */
-const pwdIn=document.getElementById('password');
-const pwdBtn=document.getElementById('pwdToggle');
-pwdBtn.addEventListener('click',()=>{
-  const show=pwdIn.type==='password';
-  pwdIn.type=show?'text':'password';
-  pwdBtn.innerHTML=show
-    ?'<svg viewBox="0 0 24 24" fill="none"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 01-4.24-4.24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2"/></svg>'
-    :'<svg viewBox="0 0 24 24" fill="none"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg>';
+const pwdIn  = document.getElementById('password');
+const pwdBtn = document.getElementById('pwdToggle');
+pwdBtn.addEventListener('click', () => {
+  const show = pwdIn.type === 'password';
+  pwdIn.type = show ? 'text' : 'password';
+  pwdBtn.innerHTML = show
+    ? '<svg viewBox="0 0 24 24" fill="none"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 01-4.24-4.24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg>';
 });
 
-/* ── FORM ── */
-const form=document.getElementById('loginForm');
-const userIn=document.getElementById('username');
-const passIn=document.getElementById('password');
-const userErr=document.getElementById('userErr');
-const passErr=document.getElementById('passErr');
-const alertEl=document.getElementById('alertErr');
-const alertMsg=document.getElementById('alertMsg');
-const submitBtn=document.getElementById('submitBtn');
+/* ── MODE DETECTION ── */
+// URL param ?mode=register shows register mode
+const urlMode    = new URLSearchParams(window.location.search).get('mode');
+let   isRegister = urlMode === 'register' || window.location.pathname === '/register';
 
-function setErr(el,errEl,msg){el.classList.add('err');errEl.textContent=msg;errEl.classList.add('show');}
-function clearErr(el,errEl){el.classList.remove('err');errEl.classList.remove('show');}
+const eyebrow   = document.querySelector('.form-eyebrow');
+const titleEl   = document.querySelector('.form-title');
+const switchEl  = document.querySelector('.form-switch');
+const submitBtn = document.getElementById('submitBtn');
 
-userIn.addEventListener('input',()=>clearErr(userIn,userErr));
-passIn.addEventListener('input',()=>clearErr(passIn,passErr));
+function applyMode() {
+  if (isRegister) {
+    eyebrow.textContent   = 'Create Account';
+    titleEl.textContent   = 'Get Started';
+    switchEl.innerHTML    = 'Already have an account? <a href="/login">Sign in →</a>';
+    submitBtn.textContent = 'Create Account';
+  } else {
+    eyebrow.textContent   = 'Sign In';
+    titleEl.textContent   = 'Sign In';
+    switchEl.innerHTML    = 'No account yet? <a href="/register">Create one free →</a>';
+    submitBtn.textContent = 'Sign In';
+  }
+}
+applyMode();
 
-form.addEventListener('submit',async e=>{
+/* ── FORM LOGIC ── */
+const form    = document.getElementById('loginForm');
+const userIn  = document.getElementById('username');
+const passIn  = document.getElementById('password');
+const userErr = document.getElementById('userErr');
+const passErr = document.getElementById('passErr');
+const alertEl = document.getElementById('alertErr');
+const alertMsg= document.getElementById('alertMsg');
+
+function setErr(el, errEl, msg) { el.classList.add('err'); errEl.textContent = msg; errEl.classList.add('show'); }
+function clearErr(el, errEl)    { el.classList.remove('err'); errEl.classList.remove('show'); }
+
+userIn.addEventListener('input', () => clearErr(userIn, userErr));
+passIn.addEventListener('input', () => clearErr(passIn, passErr));
+
+form.addEventListener('submit', async e => {
   e.preventDefault();
   alertEl.classList.remove('show');
-  let ok=true;
-  const username=userIn.value.trim(), pw=passIn.value;
-  if(!username){
-  setErr(userIn,userErr,'Username is required.');
-  ok=false;
-}
-  if(!pw){setErr(passIn,passErr,'Password is required.');ok=false;}
-  if(!ok)return;
 
-  submitBtn.textContent='Signing in...';
-  submitBtn.disabled=true;
+  const username = userIn.value.trim();
+  const password = passIn.value;
+  let ok = true;
 
-  try{
-    const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:username,password:pw})});
-    const data=await res.json();
-if(res.ok){
-  const user = {
-    name: data.name || username,
-    email: data.email || username,
-    initials: (data.name || username).slice(0,2).toUpperCase(),
-    plan: data.plan || 'Free'
-  };
-  sessionStorage.setItem('shieldai_user', JSON.stringify(user));
-  submitBtn.textContent='✓ Signed In';
-  submitBtn.style.background='#10b981';
-  setTimeout(()=>window.location.href=data.redirect||'/dashboard',700);
+  if (!username) { setErr(userIn, userErr, 'Username is required.');         ok = false; }
+  if (!password) { setErr(passIn, passErr, 'Password is required.');         ok = false; }
+  if (isRegister && password.length < 6) {
+    setErr(passIn, passErr, 'Password must be at least 6 characters.');      ok = false;
+  }
+  if (!ok) return;
 
-    }else{
-      alertMsg.textContent=data.message||'Invalid email or password.';
+  submitBtn.textContent = isRegister ? 'Creating account...' : 'Signing in...';
+  submitBtn.disabled    = true;
+
+  const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
+
+  try {
+    const res  = await fetch(endpoint, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      submitBtn.textContent = isRegister ? '✓ Account Created' : '✓ Signed In';
+      submitBtn.style.background = '#10b981';
+      setTimeout(() => window.location.href = '/dashboard', 700);
+    } else {
+      alertMsg.textContent = data.message || 'Something went wrong. Please try again.';
       alertEl.classList.add('show');
-      submitBtn.textContent='Sign In';
-      submitBtn.disabled=false;
+      submitBtn.textContent = isRegister ? 'Create Account' : 'Sign In';
+      submitBtn.disabled    = false;
     }
-  }catch{
-    alertMsg.textContent='Unable to reach server. Please try again.';
+  } catch {
+    alertMsg.textContent = 'Network error. Please check your connection and try again.';
     alertEl.classList.add('show');
-    submitBtn.textContent='Sign In';
-    submitBtn.disabled=false;
+    submitBtn.textContent = isRegister ? 'Create Account' : 'Sign In';
+    submitBtn.disabled    = false;
   }
 });
 </script>
