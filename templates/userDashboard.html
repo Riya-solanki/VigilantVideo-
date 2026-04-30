@@ -358,8 +358,6 @@ body{
     <div class="gate-btns">
       <a href="/login" class="gate-btn primary">SIGN IN</a>
       <a href="/register" class="gate-btn secondary">Create Free Account</a>
-      <a href="/login" class="gate-btn primary">SIGN IN</a>
-      <a href="/register" class="gate-btn secondary">Create Free Account</a>
     </div>
   </div>
 </div>
@@ -397,23 +395,23 @@ body{
       <div class="stats-row">
         <div class="stat-card">
           <div class="sc-label">Total Videos Protected</div>
-          <div class="sc-val cyan" id="statVideos">0</div>
-          <div class="sc-sub up" id="statVideosChange">Loading...</div>
+          <div class="sc-val cyan" id="statVideos">24</div>
+          <div class="sc-sub up">+3 this week</div>
         </div>
         <div class="stat-card">
           <div class="sc-label">Processing Now</div>
-          <div class="sc-val amber" id="statProc">0</div>
-          <div class="sc-sub warn" id="statProcSub">Loading...</div>
+          <div class="sc-val amber" id="statProc">2</div>
+          <div class="sc-sub warn">est. 4 min remaining</div>
         </div>
         <div class="stat-card">
           <div class="sc-label">Scrape Attempts Blocked</div>
-          <div class="sc-val red" id="statBlocked">0</div>
-          <div class="sc-sub up" id="statBlockedSub">Loading...</div>
+          <div class="sc-val red" id="statBlocked">138</div>
+          <div class="sc-sub up">+12 today</div>
         </div>
         <div class="stat-card">
           <div class="sc-label">Storage Used</div>
-          <div class="sc-val green" id="statStorage">0 B</div>
-          <div class="sc-sub" id="statStorageSub">of 10 GB</div>
+          <div class="sc-val green" id="statStorage">6.2 GB</div>
+          <div class="sc-sub">of 10 GB</div>
         </div>
       </div>
 
@@ -509,14 +507,12 @@ body{
     <div class="modal-body">
       <input type="file" id="fileInput" accept=".mp4,.mov,.avi,.mkv" style="display:none"/>
       <div class="m-drop" id="mDrop" onclick="document.getElementById('fileInput').click()">
-        <div class="m-drop-icon">ðŸŽ¬</div>
         <div class="m-drop-title">Drop your video here</div>
-        <div class="m-drop-sub">MP4 Â· MOV Â· AVI Â· MKV Â· up to 10 GB</div>
+        <div class="m-drop-sub">MP4 · MOV · AVI · MKV — up to 10 GB</div>
         <button class="m-browse" type="button">Browse Files</button>
       </div>
       <div class="m-file-info" id="mFileInfo">
         <div class="m-fi-row">
-          <span style="font-size:1.25rem">ðŸŽ¬</span>
           <div>
             <div class="m-fi-name" id="mFileName">â€”</div>
             <div class="m-fi-size" id="mFileSize">â€”</div>
@@ -557,12 +553,11 @@ async function loadDashboard() {
     const data = await res.json();
     document.getElementById('authGate').classList.add('hidden');
 
-    // â”€â”€ Stat cards â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    document.getElementById('statVideos').textContent  = data.stats.videos_protected;
+     document.getElementById('statVideos').textContent  = data.stats.videos_protected;
     document.getElementById('statProc').textContent    = data.stats.processing_now;
     document.getElementById('statBlocked').textContent = data.stats.scrape_attempts_blocked;
 
-    // â”€â”€ Storage bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
     const usedB  = data.stats.storage_used_bytes;
     const limitB = data.stats.storage_limit_bytes;
     const pct    = limitB > 0 ? Math.min((usedB / limitB) * 100, 100).toFixed(1) : 0;
@@ -906,4 +901,3 @@ window.addEventListener('DOMContentLoaded', loadDashboard);
 </script>
 </body>
 </html>
-
