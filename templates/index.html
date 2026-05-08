@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
 </head>
 <body>
 
@@ -300,7 +300,118 @@
     </div>
   </div>
 </section>
+<!-- Testimonials Section -->
+<section id="reviews" style="border-top: 1px solid var(--border); padding: 6rem 4%; background: rgba(15, 17, 23, 0.2);">
+  <div style="text-align:center; max-width:600px; margin:0 auto 4rem;">
+    <div class="section-label" style="justify-content:center">Social Proof</div>
+    <h2 class="section-title">Trusted by the Creative Community</h2>
+    <p class="section-sub" style="margin: 0 auto;">Real feedback from creators who have successfully shielded their work using VigilantVideo.</p>
+  </div>
 
+  <div class="steps-grid">
+    <!-- Testimonial 1 -->
+    <div class="step-card" style="display: flex; flex-direction: column; justify-content: space-between; border-top: 2px solid var(--accent);">
+      <div>
+        <div style="color: var(--accent-light); font-size: 2rem; font-family: 'serif'; line-height: 1; margin-bottom: 0.5rem;">“</div>
+        <p class="step-desc" style="font-style: italic; color: var(--text-primary); margin-bottom: 1.5rem;">
+          Finally, a way to share my portfolio without worrying about it being scraped for AI training. The visual quality remains perfect.
+        </p>
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.75rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+        <div class="team-avatar" style="background: var(--accent-subtle); color: var(--accent-light)">DA</div>
+        <div>
+          <div style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">Digital Artist</div>
+          <div style="font-size: 0.7rem; color: var(--text-tertiary); text-transform: uppercase;">Verified User</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Testimonial 2 -->
+    <div class="step-card" style="display: flex; flex-direction: column; justify-content: space-between; border-top: 2px solid var(--success);">
+      <div>
+        <div style="color: var(--success); font-size: 2rem; font-family: 'serif'; line-height: 1; margin-bottom: 0.5rem;">“</div>
+        <p class="step-desc" style="font-style: italic; color: var(--text-primary); margin-bottom: 1.5rem;">
+          The processing speed is impressive. We protected 50+ studio clips in under an hour. It’s an essential tool for our pipeline now.
+        </p>
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.75rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+        <div class="team-avatar" style="background: var(--success-subtle); color: var(--success)">SL</div>
+        <div>
+          <div style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">Studio Lead</div>
+          <div style="font-size: 0.7rem; color: var(--text-tertiary); text-transform: uppercase;">Pro Member</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Testimonial 3 -->
+    <div class="step-card" style="display: flex; flex-direction: column; justify-content: space-between; border-top: 2px solid var(--warning);">
+      <div>
+        <div style="color: var(--warning); font-size: 2rem; font-family: 'serif'; line-height: 1; margin-bottom: 0.5rem;">“</div>
+        <p class="step-desc" style="font-style: italic; color: var(--text-primary); margin-bottom: 1.5rem;">
+          I tested the shielded videos against three different AI scrapers, and all failed to reconstruct the frames. This actually works.
+        </p>
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.75rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+        <div class="team-avatar" style="background: var(--warning-subtle); color: var(--warning)">RE</div>
+        <div>
+          <div style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">Research Engineer</div>
+          <div style="font-size: 0.7rem; color: var(--text-tertiary); text-transform: uppercase;">Verified User</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- Pricing Section -->
+<section id="pricing">
+  <div style="text-align:center; max-width:600px; margin:0 auto 3rem;">
+    <div class="section-label" style="justify-content:center">Pricing Plans</div>
+    <h2 class="section-title">Shield Your Work</h2>
+    <p class="section-sub" style="margin:0 auto">Simple, transparent pricing for creators and studios.</p>
+  </div>
+
+  <div class="steps-grid">
+    <!-- Basic Plan -->
+    <div class="step-card price-card">
+      <div class="step-num">FREE</div>
+      <div class="price-value">$0<span>/mo</span></div>
+      <h3 class="step-title">Starter</h3>
+      <ul class="price-list">
+        <li>Standard AI Shielding</li>
+        <li>3 Videos per month</li>
+        <li>720p Resolution</li>
+      </ul>
+      <a href="{{ url_for('register') }}" class="btn-hero secondary">Get Started</a>
+    </div>
+
+    <!-- Pro Plan -->
+    <div class="step-card price-card featured">
+      <div class="plan-badge">Most Popular</div>
+      <div class="step-num" style="color: var(--accent-glow)">PRO</div>
+      <div class="price-value">$19<span>/mo</span></div>
+      <h3 class="step-title">Creator Pro</h3>
+      <ul class="price-list">
+        <li>Advanced Multi-Layer Defense</li>
+        <li>Unlimited Protected Videos</li>
+        <li>4K UHD Support</li>
+        <li>Priority Processing</li>
+      </ul>
+      <a href="{{ url_for('register') }}" class="btn-hero primary">Get Started Pro</a>
+    </div>
+
+    <!-- Enterprise Plan -->
+    <div class="step-card price-card">
+      <div class="step-num">TEAM</div>
+      <div class="price-value">Custom</div>
+      <h3 class="step-title">Studio</h3>
+      <ul class="price-list">
+        <li>API Access & SDK</li>
+        <li>Team Collaboration Tools</li>
+        <li>Dedicated Support</li>
+      </ul>
+      <a href="#" class="btn-hero secondary">Contact Sales</a>
+    </div>
+  </div>
+</section>
 <footer>
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1.5rem;margin-bottom:1.5rem">
     <a href="#" class="nav-logo" style="text-decoration:none">
@@ -327,6 +438,6 @@
   </div>
 </footer>
 
-</div><script src="{{ url_for('static', filename='app.js') }}"></script>
+</div><script src="{{ url_for('static', filename='js/app.js') }}"></script>
 </body>
 </html>

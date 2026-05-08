@@ -252,8 +252,17 @@ nav.scrolled {
 }
 
 @keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(0.8); }
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.5;
+        transform: scale(0.8);
+    }
 }
 
 .hero-title {
@@ -387,8 +396,15 @@ nav.scrolled {
 }
 
 @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-10px);
+    }
 }
 
 .float-label {
@@ -426,8 +442,15 @@ nav.scrolled {
 }
 
 @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* ══════════════════════════════════════════
@@ -713,8 +736,13 @@ section {
 }
 
 @keyframes fillBar {
-    from { width: 0; }
-    to { width: var(--w); }
+    from {
+        width: 0;
+    }
+
+    to {
+        width: var(--w);
+    }
 }
 
 .tech-pct {
@@ -1111,7 +1139,9 @@ section {
 }
 
 @keyframes rotate {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .proc-status {
@@ -1187,8 +1217,15 @@ section {
 }
 
 @keyframes popIn {
-    from { transform: scale(0.5); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
+    from {
+        transform: scale(0.5);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 .done-title {
@@ -1329,7 +1366,7 @@ footer {
         gap: 2.5rem;
     }
 
-    .dash-coverage > div {
+    .dash-coverage>div {
         grid-template-columns: 1fr !important;
     }
 }
@@ -1368,5 +1405,85 @@ footer {
 
     section {
         padding: 3.5rem 5%;
+    }
+}
+
+/* Pricing Specific Adjustments */
+.price-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 450px;
+}
+
+.price-value {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.02em;
+}
+
+.price-value span {
+    font-size: 1rem;
+    color: var(--text-tertiary);
+    font-weight: 400;
+}
+
+.price-list {
+    list-style: none;
+    margin: 1.5rem 0 2rem 0;
+    padding: 0;
+    flex-grow: 1;
+}
+
+.price-list li {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+}
+
+/* Add a checkmark icon before each list item */
+.price-list li::before {
+    content: '✓';
+    color: var(--accent-light);
+    font-weight: 800;
+}
+
+/* Featured Plan Highlights */
+.price-card.featured {
+    border-color: var(--accent);
+    background: linear-gradient(180deg, var(--bg-secondary) 0%, rgba(99, 102, 241, 0.05) 100%);
+    transform: scale(1.05);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.plan-badge {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--accent);
+    color: #fff;
+    padding: 4px 14px;
+    border-radius: 99px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.price-card .btn-hero {
+    width: 100%;
+    justify-content: center;
+}
+
+@media (max-width: 768px) {
+    .price-card.featured {
+        transform: scale(1);
+        margin: 1rem 0;
     }
 }

@@ -4,7 +4,7 @@ app.py — Vigilant Video — Main Flask Application
 import os
 import uuid
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 
 import boto3
@@ -66,29 +66,49 @@ def login_required_api(f):
 def check_upload_limit(user):
     if not user.subscription:
         return False, 'No active subscription found.'
-    limit = UsageLimit.query.get(user.subscription.plan)
+    sub = user.subscription
+
+    # ── Lazy monthly reset ──────────────────────────────────────────
+    # If the current month/year differs from when the counter was last
+    # reset (tracked via started_at), zero the counter automatically.
+    now = datetime.utcnow()
+    period_start = sub.started_at or now
+    if now.year > period_start.year or now.month > period_start.month:
+        sub.monthly_uploads_used = 0
+        sub.started_at = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        db.session.commit()
+
+    limit = UsageLimit.query.get(sub.plan)
     if not limit: return False, 'Plan not found.'
     if limit.max_videos_per_month == -1: return True, 'ok'
-    used = user.subscription.monthly_uploads_used if user.subscription else 0
-    if used >= limit.max_videos_per_month:
+    if sub.monthly_uploads_used >= limit.max_videos_per_month:
         return False, 'Monthly upload limit reached.'
     return True, 'ok'
 
 # ══════════════════════════════════════════════════════════════════════
 # DASHBOARD / FRONTEND ROUTES
-# ══════════════════════════════════════════════════════════════════════
 @app.route('/')
-def home(): return render_template('index.html')
+def index(): 
+    return render_template('index.html')
 
 @app.route('/login')
-def login(): return redirect(url_for('dashboard')) if session.get('user_id') else render_template('login.html')
+def login(): 
+    if session.get('user_id'):
+        return redirect(url_for('dashboard')) # Redirect logged-in users to dashboard
+    return render_template('login.html')
 
 @app.route('/register')
-def register(): return redirect(url_for('dashboard')) if session.get('user_id') else render_template('login.html')
+def register(): 
+    if session.get('user_id'):
+        return redirect(url_for('dashboard'))
+    # CHANGE THIS to your registration filename (e.g., register.html)
+    return render_template('register.html') 
 
 @app.route('/dashboard')
-def dashboard(): return redirect(url_for('login')) if not session.get('user_id') else render_template('userDashboard.html')
-
+def dashboard(): 
+    if not session.get('user_id'):
+        return redirect(url_for('login'))
+    return render_template('userDashboard.html')
 # ══════════════════════════════════════════════════════════════════════
 # API — AUTH (LOGIN / REGISTER / LOGOUT / ME)
 # ══════════════════════════════════════════════════════════════════════
@@ -163,7 +183,27 @@ def api_dashboard():
                      if limit_row else 3)
     uploads_used  = user.subscription.monthly_uploads_used if user.subscription else 0
 
-    # ── Video rows for the library table ──────────────────────────
+    # -- Expire stale videos (lazy evaluation on dashboard load) ----------
+    _s3 = get_s3_client()
+    _bucket = current_app.config['R2_BUCKET_NAME']
+    _changed = False
+    for j in jobs:
+        if (
+            j.status == 'done'
+            and j.completed_at
+            and datetime.utcnow() - j.completed_at > timedelta(days=3)
+        ):
+            try:
+                if j.output_path:
+                    _s3.delete_object(Bucket=_bucket, Key=j.output_path)
+            except Exception as _e:
+                app.logger.warning(f"Expiry: failed to delete {j.output_path} from R2: {_e}")
+            j.status = 'expired'
+            _changed = True
+    if _changed:
+        db.session.commit()
+
+    # -- Video rows for the library table ----------------------------------────
     def _job_to_video(j):
         fname = j.original_filename or ''
         parts = fname.rsplit('.', 1)
@@ -175,7 +215,7 @@ def api_dashboard():
             'ext':    ext,
             'date':   j.created_at.strftime('%d %b %Y') if hasattr(j.created_at, 'strftime') else str(j.created_at)[:10],
             'size':   j.size_display(),
-            'status': 'done' if j.status == 'done' else j.status,  # done→download ready
+            'status': j.status,  # pass as-is: done, expired, error, pending, processing
         }
 
     videos = [_job_to_video(j) for j in jobs]
@@ -344,7 +384,15 @@ def api_status(job_id):
     user = get_current_user()
     job  = ProtectionJob.query.filter_by(job_id=job_id, user_id=user.id).first()
     if not job: return jsonify({'message': 'Job not found.'}), 404
-    return jsonify({'job_id': job.job_id, 'status': job.status, 'error': job.error_message}), 200
+    
+    try:
+        r = get_redis_client()
+        progress_str = r.get(f"progress:{job_id}")
+        progress = float(progress_str) if progress_str else (100.0 if job.status == 'done' else 0.0)
+    except Exception:
+        progress = 100.0 if job.status == 'done' else 0.0
+
+    return jsonify({'job_id': job.job_id, 'status': job.status, 'progress': progress, 'error': job.error_message}), 200
 
 # ══════════════════════════════════════════════════════════════════════
 # API — SECURE DOWNLOAD (PRE-SIGNED URLS) & DELETE

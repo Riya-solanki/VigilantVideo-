@@ -313,7 +313,7 @@ def protect_video_gpu(
     input_path: str, output_path: str, batch_size: int = 8,
     model_profile: str = "lite", noise_strength: float = 0.03,
     lpips_threshold: float = 0.15, jpeg_resilient: bool = True,
-    **kwargs
+    progress_callback=None, **kwargs
 ) -> dict:
     start_time = time.time()
     cap = cv2.VideoCapture(input_path)
@@ -411,6 +411,8 @@ def protect_video_gpu(
         frame_count += len(batch_originals)
         pct = (frame_count / total_frames * 100) if total_frames > 0 else 0
         logger.info(f"Progress: {frame_count}/{total_frames} frames ({pct:.1f}%)")
+        if progress_callback:
+            progress_callback(pct)
 
     cap.release()
     if writer_process:
