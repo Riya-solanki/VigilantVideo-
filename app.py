@@ -122,7 +122,11 @@ def check_upload_limit(user):
         db.session.commit()
 
     limit = UsageLimit.query.get(sub.plan)
-    if not limit: return False, 'Plan not found.'
+    if not limit: 
+        seed_usage_limits()
+        limit = UsageLimit.query.get(sub.plan)
+        if not limit:
+            return False, f"Plan '{sub.plan}' not found."
     if limit.max_videos_per_month == -1: return True, 'ok'
     if sub.monthly_uploads_used >= limit.max_videos_per_month:
         return False, 'Monthly upload limit reached.'
