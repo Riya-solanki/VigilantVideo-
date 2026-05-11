@@ -2,7 +2,7 @@
 let videos        = [];
 let queue         = [];
 let feed          = [];
-let pollingTimers = {};   // job_id â†’ setInterval id
+let pollingTimers = {};   // job_id → setInterval id
 
 // LOAD DASHBOARD FROM REAL DATABASE
 async function loadDashboard() {
@@ -13,10 +13,9 @@ async function loadDashboard() {
     const data = await res.json();
     document.getElementById('authGate').classList.add('hidden');
 
-     document.getElementById('statVideos').textContent  = data.stats.videos_protected;
+    document.getElementById('statVideos').textContent  = data.stats.videos_protected;
     document.getElementById('statProc').textContent    = data.stats.processing_now;
     document.getElementById('statBlocked').textContent = data.stats.scrape_attempts_blocked;
-
 
     const usedB  = data.stats.storage_used_bytes;
     const limitB = data.stats.storage_limit_bytes;
@@ -26,20 +25,22 @@ async function loadDashboard() {
     document.querySelector('.storage-nums').innerHTML  =
       `<strong>${fmtBytes(usedB)}</strong> of ${fmtBytes(limitB)} used`;
 
-    //  Upload quota sub-text 
+    //  Upload quota sub-text
     const sub = document.getElementById('statVideos').closest('.stat-card').querySelector('.sc-sub');
     if (sub) sub.textContent = `${data.stats.uploads_used} of ${data.stats.uploads_limit} this month`;
 
-    //  Video library 
+    //  Video library
     videos = data.videos;
     feed   = data.feed;
-    queue = data.videos.filter(v => v.status === 'pending' || v.status === 'processing').map(v => ({
-    job_id: v.job_id,
-    name: v.name + (v.ext ? '.' + v.ext : ''),
-    pct: 0,
-    stage: 'Queued · starting soon',
-    color: 'cyan'
-  }));
+    queue  = data.videos
+      .filter(v => v.status === 'pending' || v.status === 'processing')
+      .map(v => ({
+        job_id: v.job_id,
+        name:   v.name + (v.ext ? '.' + v.ext : ''),
+        pct:    0,
+        stage:  'Queued · starting soon',
+        color:  'cyan'
+      }));
     renderTable();
     renderQueue();
     renderFeed();
@@ -63,12 +64,12 @@ function startPolling(job_id) {
       const res  = await fetch(`/api/status/${job_id}`);
       if (!res.ok) { stopPolling(job_id); return; }
       const data = await res.json();
-      const status = data.status;
+      const status   = data.status;
       const progress = data.progress || 0;
 
       const qItem = queue.find(q => q.job_id === job_id);
       if (qItem) {
-        qItem.pct = Math.round(progress);
+        qItem.pct   = Math.round(progress);
         qItem.stage = 'Applying adversarial perturbations...';
         qItem.color = 'amber';
         renderQueue();
@@ -77,7 +78,6 @@ function startPolling(job_id) {
 
       if (status === 'done' || status === 'error') {
         stopPolling(job_id);
-        // Reload the full dashboard to get fresh data
         await loadDashboard();
       }
     } catch { stopPolling(job_id); }
@@ -198,39 +198,39 @@ async function downloadVideo(job_id) {
     const res  = await fetch(`/api/download/${job_id}`);
     const data = await res.json();
     if (!res.ok) { alert(data.message || 'Download failed.'); return; }
-    // Open the presigned R2 URL in a new tab
     const a = document.createElement('a');
     a.href = data.download_url;
-    a.download = data.filename || 'protected_video.mp4';
-    a.target = '_blank';
+    a.download = data.filename;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
   } catch (err) {
-    console.error('Download error:', err);
-    alert('Could not generate download link.');
+    alert('Download error. Please try again.');
   }
 }
 
 async function deleteVideo(job_id, btn) {
   if (!confirm('Delete this video? This cannot be undone.')) return;
-  btn.disabled = true;
-  btn.textContent = '...';
   try {
+    btn.disabled = true;
     const res = await fetch(`/api/video/${job_id}`, { method: 'DELETE' });
-    if (res.ok) {
-      await loadDashboard(); // refresh table
-    } else {
-      const data = await res.json();
-      alert(data.message || 'Delete failed.');
-      btn.disabled = false;
-      btn.textContent = 'Delete';
-    }
-  } catch (err) {
-    console.error('Delete error:', err);
+    const data = await res.json();
+    if (!res.ok) { alert(data.message || 'Delete failed.'); btn.disabled = false; return; }
+    await loadDashboard();
+  } catch {
+    alert('Delete failed. Please try again.');
     btn.disabled = false;
-    btn.textContent = 'Delete';
   }
 }
 
+// ════════════════════════════════════════════════════════════════════
+// UPLOAD MODAL — two-step presign + direct-to-R2 flow
+//
+// Step 1: POST /api/upload/presign  → get { job_id, upload_url, fields }
+// Step 2: POST upload_url (R2)      → direct browser-to-R2 transfer
+//         Uses XHR so we can show a real progress bar.
+// Step 3: POST /api/upload/confirm  → tell Render the file landed; queue job
+// ════════════════════════════════════════════════════════════════════
 let selectedFile = null;
 
 function openUploadModal()  { document.getElementById('uploadModal').classList.add('open'); resetUploadModal(); }
@@ -243,12 +243,16 @@ function resetUploadModal() {
   document.getElementById('mSubmit').disabled = true;
   document.getElementById('mSubmit').textContent = 'UPLOAD & PROTECT';
   document.getElementById('mSubmit').style.background = '';
+  hideUploadError();
 }
 
 function handleFileSelect(file) {
   if (!file) return;
   const ext = file.name.split('.').pop().toLowerCase();
-  if (!['mp4','mov','avi','mkv'].includes(ext)) { alert('Unsupported format. Use MP4, MOV, AVI or MKV.'); return; }
+  if (!['mp4','mov','avi','mkv'].includes(ext)) {
+    alert('Unsupported format. Use MP4, MOV, AVI or MKV.');
+    return;
+  }
   selectedFile = file;
   document.getElementById('mFileName').textContent = file.name;
   document.getElementById('mFileSize').textContent = fmtSize(file.size);
@@ -263,57 +267,169 @@ document.getElementById('fileInput').addEventListener('change', e => {
 const mDrop = document.getElementById('mDrop');
 mDrop.addEventListener('dragover',  e => { e.preventDefault(); mDrop.classList.add('drag-over'); });
 ['dragleave','dragend'].forEach(ev => mDrop.addEventListener(ev, () => mDrop.classList.remove('drag-over')));
-mDrop.addEventListener('drop', e => { e.preventDefault(); mDrop.classList.remove('drag-over'); if (e.dataTransfer.files[0]) handleFileSelect(e.dataTransfer.files[0]); });
+mDrop.addEventListener('drop', e => {
+  e.preventDefault();
+  mDrop.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) handleFileSelect(e.dataTransfer.files[0]);
+});
 
-function startUpload() {
+// ── Upload error banner (non-blocking, replaces raw alert() in the modal) ──
+function showUploadError(msg) {
+  let banner = document.getElementById('mErrorBanner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'mErrorBanner';
+    banner.style.cssText = [
+      'background:rgba(239,68,68,0.12)',
+      'border:1px solid rgba(239,68,68,0.45)',
+      'border-radius:8px',
+      'color:#fca5a5',
+      'font-size:0.82rem',
+      'padding:0.6rem 0.85rem',
+      'margin-top:0.75rem',
+      'line-height:1.4',
+      'display:none',
+    ].join(';');
+    // Insert it just before the submit button
+    const btn = document.getElementById('mSubmit');
+    btn.parentNode.insertBefore(banner, btn);
+  }
+  banner.textContent = msg;
+  banner.style.display = 'block';
+}
+
+function hideUploadError() {
+  const banner = document.getElementById('mErrorBanner');
+  if (banner) banner.style.display = 'none';
+}
+
+function _resetSubmitBtn(btn) {
+  btn.disabled    = false;
+  btn.textContent = 'UPLOAD & PROTECT';
+  btn.style.background = '';
+}
+
+async function startUpload() {
   if (!selectedFile) return;
+
   const btn  = document.getElementById('mSubmit');
   const fill = document.getElementById('mProgFill');
+  hideUploadError();
   btn.disabled    = true;
+  btn.textContent = 'PREPARING...';
+  fill.style.width = '0%';
+
+  // ── Step 1: Ask Render for a presigned upload token ──────────────
+  let presignData;
+  try {
+    const presignRes = await fetch('/api/upload/presign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename: selectedFile.name,
+        filesize: selectedFile.size,
+      }),
+    });
+    presignData = await presignRes.json();
+    if (!presignRes.ok) {
+      // Surface the backend message directly — covers "Plan not found",
+      // "Monthly upload limit reached", file-size errors, etc.
+      const errMsg = presignData.message || 'Could not start upload. Please try again.';
+      if (presignRes.status === 429) {
+        // Quota-exceeded — give a friendlier hint
+        showUploadError('⚠ ' + errMsg + ' Upgrade your plan to upload more videos.');
+      } else {
+        showUploadError(errMsg);
+      }
+      _resetSubmitBtn(btn);
+      fill.style.width = '0%';
+      return;
+    }
+  } catch {
+    showUploadError('Network error during upload setup. Please try again.');
+    _resetSubmitBtn(btn);
+    fill.style.width = '0%';
+    return;
+  }
+
+  const { job_id, upload_url, fields } = presignData;
+
+  // ── Step 2: Upload the file directly to Cloudflare R2 ───────────
+  // Build a multipart/form-data body using the presigned POST fields.
+  // The browser sends the video bytes directly to R2 — Render is not involved.
   btn.textContent = 'UPLOADING...';
 
   const formData = new FormData();
-  formData.append('video', selectedFile);
+  // All presigned fields MUST come before the file key.
+  Object.entries(fields).forEach(([k, v]) => formData.append(k, v));
+  formData.append('file', selectedFile);   // 'file' is the standard S3 key for presigned POST
 
-  const xhr = new XMLHttpRequest();
+  await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
 
-  // Real upload progress
-  xhr.upload.addEventListener('progress', e => {
-    if (e.lengthComputable) {
-      const pct = Math.round((e.loaded / e.total) * 90); // cap at 90% until server responds
-      fill.style.width = pct + '%';
-    }
+    xhr.upload.addEventListener('progress', e => {
+      if (e.lengthComputable) {
+        // Cap at 90% visually — the last 10% is the /confirm round-trip.
+        const pct = Math.round((e.loaded / e.total) * 90);
+        fill.style.width = pct + '%';
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      // R2 presigned POST returns 204 No Content on success.
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+      } else {
+        reject(new Error(`R2 upload failed: HTTP ${xhr.status}\n${xhr.responseText}`));
+      }
+    });
+
+    xhr.addEventListener('error', () => reject(new Error('Network error during upload to storage.')));
+    xhr.addEventListener('abort', () => reject(new Error('Upload aborted.')));
+
+    xhr.open('POST', upload_url);
+    xhr.send(formData);
+  }).catch(err => {
+    showUploadError(err.message || 'Upload to storage failed. Please try again.');
+    _resetSubmitBtn(btn);
+    fill.style.width = '0%';
+    throw err;   // exit the outer async function
   });
 
-  xhr.addEventListener('load', async () => {
-    fill.style.width = '100%';
-    if (xhr.status === 202) {
-      const data = JSON.parse(xhr.responseText);
-      btn.textContent = 'âœ“ QUEUED';
-      btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
-      // Start polling the new job
-      if (data.job_id) startPolling(data.job_id);
-      // Reload dashboard to show the new entry
-      await loadDashboard();
-      setTimeout(closeUploadModal, 1000);
-    } else {
-      let msg = 'Upload failed.';
-      try { msg = JSON.parse(xhr.responseText).message || msg; } catch {}
-      alert(msg);
-      btn.disabled    = false;
-      btn.textContent = 'UPLOAD & PROTECT';
+  // ── Step 3: Tell Render the file landed; queue the GPU job ───────
+  btn.textContent  = 'QUEUING...';
+  fill.style.width = '95%';
+
+  try {
+    const confirmRes = await fetch('/api/upload/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_id }),
+    });
+    const confirmData = await confirmRes.json();
+
+    if (!confirmRes.ok) {
+      showUploadError(confirmData.message || 'Upload complete but queuing failed. Please contact support.');
+      _resetSubmitBtn(btn);
       fill.style.width = '0%';
+      return;
     }
-  });
 
-  xhr.addEventListener('error', () => {
-    alert('Network error during upload. Please try again.');
-    btn.disabled    = false;
-    btn.textContent = 'UPLOAD & PROTECT';
-  });
+    // All done — show success state
+    hideUploadError();
+    fill.style.width = '100%';
+    btn.textContent  = '✓ QUEUED';
+    btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
 
-  xhr.open('POST', '/api/upload');
-  xhr.send(formData);
+    if (confirmData.job_id) startPolling(confirmData.job_id);
+    await loadDashboard();
+    setTimeout(closeUploadModal, 1000);
+
+  } catch {
+    showUploadError('Network error while confirming upload. Please try again.');
+    _resetSubmitBtn(btn);
+    fill.style.width = '0%';
+  }
 }
 
 function openLogoutModal()  { document.getElementById('logoutModal').classList.add('open'); }

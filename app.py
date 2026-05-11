@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 
 import boto3
-from botocore.client import Config  # Added for R2 signature version
+from botocore.client import Config  # Required for R2 signature version
 import redis
 from flask import (
     Flask, render_template, request, current_app,
@@ -22,13 +22,58 @@ from models import (
     DownloadLog, UsageLimit, WatermarkActivation
 )
 
+def _seed_usage_limits():
+    """
+    Insert default plan rows into usage_limits if they don't exist yet.
+    Safe to call on every startup — skips rows that are already present.
+    This ensures the app works even if init_db.py was never run manually.
+    """
+    plans = [
+        {
+            'plan':                      'free',
+            'max_videos_per_month':      3,
+            'max_video_length_secs':     120,            # 2 minutes
+            'max_file_size_bytes':       209_715_200,    # 200 MB
+            'adversarial_enabled':       False,
+            'freq_perturbation_enabled': False,
+            'processing_priority':       'low',
+        },
+        {
+            'plan':                      'pro',
+            'max_videos_per_month':      50,
+            'max_video_length_secs':     1_800,           # 30 minutes
+            'max_file_size_bytes':       1_073_741_824,   # 1 GB
+            'adversarial_enabled':       True,
+            'freq_perturbation_enabled': True,
+            'processing_priority':       'medium',
+        },
+        {
+            'plan':                      'business',
+            'max_videos_per_month':      -1,              # unlimited
+            'max_video_length_secs':     7_200,           # 2 hours
+            'max_file_size_bytes':       5_368_709_120,   # 5 GB
+            'adversarial_enabled':       True,
+            'freq_perturbation_enabled': True,
+            'processing_priority':       'high',
+        },
+    ]
+    inserted = 0
+    for p in plans:
+        if not UsageLimit.query.get(p['plan']):
+            db.session.add(UsageLimit(**p))
+            inserted += 1
+    if inserted:
+        db.session.commit()
+
+
 def create_app(env=None):
     app = Flask(__name__)
     env = env or os.environ.get('FLASK_ENV', 'default')
     app.config.from_object(config[env])
     db.init_app(app)
     with app.app_context():
-        db.create_all()   # Create tables on startup if they don't exist
+        db.create_all()          # Create tables on startup if they don't exist
+        _seed_usage_limits()     # Ensure plan rows exist — safe if already seeded
     return app
 
 app = create_app()
@@ -69,8 +114,6 @@ def check_upload_limit(user):
     sub = user.subscription
 
     # ── Lazy monthly reset ──────────────────────────────────────────
-    # If the current month/year differs from when the counter was last
-    # reset (tracked via started_at), zero the counter automatically.
     now = datetime.utcnow()
     period_start = sub.started_at or now
     if now.year > period_start.year or now.month > period_start.month:
@@ -88,27 +131,27 @@ def check_upload_limit(user):
 # ══════════════════════════════════════════════════════════════════════
 # DASHBOARD / FRONTEND ROUTES
 @app.route('/')
-def index(): 
+def index():
     return render_template('index.html')
 
 @app.route('/login')
-def login(): 
+def login():
     if session.get('user_id'):
-        return redirect(url_for('dashboard')) # Redirect logged-in users to dashboard
+        return redirect(url_for('dashboard'))
     return render_template('login.html')
 
 @app.route('/register')
-def register(): 
+def register():
     if session.get('user_id'):
         return redirect(url_for('dashboard'))
-    # CHANGE THIS to your registration filename (e.g., register.html)
-    return render_template('register.html') 
+    return render_template('register.html')
 
 @app.route('/dashboard')
-def dashboard(): 
+def dashboard():
     if not session.get('user_id'):
         return redirect(url_for('login'))
     return render_template('userDashboard.html')
+
 # ══════════════════════════════════════════════════════════════════════
 # API — AUTH (LOGIN / REGISTER / LOGOUT / ME)
 # ══════════════════════════════════════════════════════════════════════
@@ -138,7 +181,7 @@ def api_register():
         return jsonify({'message': 'Username already taken.'}), 409
     user = User(username=username, password_hash=generate_password_hash(password))
     db.session.add(user)
-    db.session.flush()  # get user.id before commit
+    db.session.flush()
     sub  = Subscription(user_id=user.id, plan='free')
     db.session.add(sub)
     db.session.commit()
@@ -158,32 +201,27 @@ def api_me():
     return jsonify({'user': user.to_dict()}), 200
 
 # ══════════════════════════════════════════════════════════════════════
-# API — DASHBOARD DATA (single endpoint, everything in one call)
+# API — DASHBOARD DATA
 # ══════════════════════════════════════════════════════════════════════
 @app.route('/api/dashboard', methods=['GET'])
 @login_required_api
 def api_dashboard():
     user = get_current_user()
 
-    # ── All jobs for this user (newest first) ──────────────────────
     jobs = ProtectionJob.query.filter_by(user_id=user.id)\
                .order_by(ProtectionJob.created_at.desc()).all()
 
-    # ── Stats ──────────────────────────────────────────────────────
     videos_protected  = sum(1 for j in jobs if j.status == 'done')
     processing_now    = sum(1 for j in jobs if j.status in ('pending', 'processing'))
     storage_used      = sum(j.original_size_bytes or 0 for j in jobs)
 
-    # Storage limit from UsageLimit table (default 10 GB for free)
     limit_row = UsageLimit.query.get(user.plan_tier)
     storage_limit = (limit_row.max_file_size_bytes
                      if limit_row and limit_row.max_file_size_bytes != -1
-                     else 10 * 1024 ** 3)  # 10 GB default
-    uploads_limit = (limit_row.max_videos_per_month
-                     if limit_row else 3)
+                     else 10 * 1024 ** 3)
+    uploads_limit = (limit_row.max_videos_per_month if limit_row else 3)
     uploads_used  = user.subscription.monthly_uploads_used if user.subscription else 0
 
-    # -- Expire stale videos (lazy evaluation on dashboard load) ----------
     _s3 = get_s3_client()
     _bucket = current_app.config['R2_BUCKET_NAME']
     _changed = False
@@ -203,7 +241,6 @@ def api_dashboard():
     if _changed:
         db.session.commit()
 
-    # -- Video rows for the library table ----------------------------------────
     def _job_to_video(j):
         fname = j.original_filename or ''
         parts = fname.rsplit('.', 1)
@@ -215,14 +252,13 @@ def api_dashboard():
             'ext':    ext,
             'date':   j.created_at.strftime('%d %b %Y') if hasattr(j.created_at, 'strftime') else str(j.created_at)[:10],
             'size':   j.size_display(),
-            'status': j.status,  # pass as-is: done, expired, error, pending, processing
+            'status': j.status,
         }
 
     videos = [_job_to_video(j) for j in jobs]
 
-    # ── Activity feed (recent completions + downloads) ─────────────
     feed = []
-    for j in jobs[:10]:  # cap at 10 entries
+    for j in jobs[:10]:
         if j.status == 'done' and j.completed_at:
             feed.append({
                 'dot':  'green',
@@ -247,7 +283,7 @@ def api_dashboard():
         'stats': {
             'videos_protected':        videos_protected,
             'processing_now':          processing_now,
-            'scrape_attempts_blocked': 0,  # placeholder — no detection table yet
+            'scrape_attempts_blocked': 0,
             'storage_used_bytes':      storage_used,
             'storage_limit_bytes':     storage_limit,
             'uploads_used':            uploads_used,
@@ -258,7 +294,6 @@ def api_dashboard():
     }), 200
 
 def _time_ago(dt):
-    """Return a human-readable 'X ago' string for a datetime."""
     if not dt:
         return ''
     diff = datetime.utcnow() - dt
@@ -268,81 +303,146 @@ def _time_ago(dt):
     if secs < 86400: return f'{secs // 3600} hr ago'
     return f'{secs // 86400} days ago'
 
+
 # ══════════════════════════════════════════════════════════════════════
-# API — ASYNC VIDEO UPLOAD (REDIS QUEUE)
+# API — STEP 1 OF 2: GENERATE PRESIGNED POST URL
+# The browser calls this FIRST to get a short-lived upload token.
+# Render only does auth + DB work — no file bytes touch this server.
 # ══════════════════════════════════════════════════════════════════════
-@app.route('/api/upload', methods=['POST'])
+@app.route('/api/upload/presign', methods=['POST'])
 @login_required_api
-def api_upload():
+def api_presign_upload():
     user = get_current_user()
     allowed, msg = check_upload_limit(user)
-    if not allowed: return jsonify({'message': msg}), 429
+    if not allowed:
+        return jsonify({'message': msg}), 429
 
-    if 'video' not in request.files: return jsonify({'message': 'No file uploaded.'}), 400
-    f = request.files['video']
-    name = (f.filename or '').strip()
-    ext = name.rsplit('.', 1)[-1].lower() if '.' in name else ''
-    
+    data = request.get_json(silent=True) or {}
+    filename = (data.get('filename') or '').strip()
+    filesize = data.get('filesize', 0)
+
+    if not filename:
+        return jsonify({'message': 'filename is required.'}), 400
+
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
     if ext not in app.config.get('ALLOWED_EXTENSIONS', {'mp4', 'mov', 'avi', 'mkv'}):
         return jsonify({'message': f'Unsupported format: .{ext}'}), 415
 
-    job_id = str(uuid.uuid4())
-    upload_dir = app.config.get('UPLOAD_FOLDER', 'uploads')
-    os.makedirs(upload_dir, exist_ok=True)
-    local_path = os.path.join(upload_dir, f'{job_id}.{ext}')
-    f.save(local_path)
-    file_size = os.path.getsize(local_path)
+    # Check per-plan file size limit
+    limit_row = UsageLimit.query.get(user.plan_tier)
+    if limit_row and limit_row.max_file_size_bytes != -1:
+        if filesize > limit_row.max_file_size_bytes:
+            return jsonify({'message': 'File exceeds your plan\'s size limit.'}), 413
 
-    # 1. Upload Raw File to Cloudflare R2
+    job_id = str(uuid.uuid4())
+    raw_r2_key       = f"raw/{job_id}.{ext}"
+    protected_r2_key = f"protected/{job_id}.{ext}"
+
+    # Generate a presigned POST — valid for 15 minutes.
+    # The browser will POST the file directly to R2 using these credentials.
     s3 = get_s3_client()
     bucket = current_app.config['R2_BUCKET_NAME']
-    raw_r2_key = f"raw/{job_id}.{ext}"
-    protected_r2_key = f"protected/{job_id}.{ext}"
-    
-    s3.upload_file(local_path, bucket, raw_r2_key)
-    os.remove(local_path) # Scorched earth: delete local file immediately
 
-    # 2. Save Pending Job in Database
+    try:
+        presigned = s3.generate_presigned_post(
+            Bucket=bucket,
+            Key=raw_r2_key,
+            Fields={
+                'Content-Type': f'video/{ext}',
+            },
+            Conditions=[
+                ['content-length-range', 1, app.config.get('MAX_UPLOAD_BYTES', 5 * 1024 ** 3)],
+                {'Content-Type': f'video/{ext}'},
+            ],
+            ExpiresIn=900  # 15 minutes
+        )
+    except Exception as e:
+        app.logger.error(f"Failed to generate presigned POST: {e}")
+        return jsonify({'message': 'Could not generate upload URL. Please try again.'}), 500
+
+    # Create a 'pending_presign' job so we can validate the confirm call later.
     job = ProtectionJob(
         job_id=job_id,
         user_id=user.id,
-        status='pending',
-        original_filename=name,
-        original_size_bytes=file_size,
-        input_path=raw_r2_key, 
+        status='pending_presign',       # special transient status
+        original_filename=filename,
+        original_size_bytes=filesize,
+        input_path=raw_r2_key,
         output_path=protected_r2_key
     )
     db.session.add(job)
+    # Increment quota now — rolled back in /confirm if upload never completes.
     user.subscription.monthly_uploads_used += 1
     db.session.commit()
 
-    # 3. Push to Upstash Redis with Failure Handling
+    return jsonify({
+        'job_id':     job_id,
+        'upload_url': presigned['url'],    # R2 endpoint
+        'fields':     presigned['fields'], # Hidden form fields the browser must POST
+    }), 200
+
+
+# ══════════════════════════════════════════════════════════════════════
+# API — STEP 2 OF 2: CONFIRM UPLOAD & DISPATCH TO WORKER
+# Browser calls this AFTER the direct-to-R2 upload succeeds.
+# Render only does DB work + Redis push — still no file bytes here.
+# ══════════════════════════════════════════════════════════════════════
+@app.route('/api/upload/confirm', methods=['POST'])
+@login_required_api
+def api_confirm_upload():
+    user = get_current_user()
+    data = request.get_json(silent=True) or {}
+    job_id = (data.get('job_id') or '').strip()
+
+    if not job_id:
+        return jsonify({'message': 'job_id is required.'}), 400
+
+    job = ProtectionJob.query.filter_by(job_id=job_id, user_id=user.id).first()
+    if not job:
+        return jsonify({'message': 'Job not found.'}), 404
+    if job.status != 'pending_presign':
+        return jsonify({'message': 'Job already confirmed or invalid state.'}), 409
+
+    # Optionally verify the object actually landed in R2 before queuing.
+    # This prevents someone calling /confirm without actually uploading.
+    s3 = get_s3_client()
+    bucket = current_app.config['R2_BUCKET_NAME']
+    try:
+        s3.head_object(Bucket=bucket, Key=job.input_path)
+    except Exception:
+        # Object not found — roll back the quota increment and delete the phantom job.
+        user.subscription.monthly_uploads_used = max(0, user.subscription.monthly_uploads_used - 1)
+        db.session.delete(job)
+        db.session.commit()
+        return jsonify({'message': 'Upload not found in storage. Please try again.'}), 404
+
+    # Transition to proper 'pending' and push to the GPU worker queue.
+    job.status = 'pending'
+    db.session.commit()
+
     try:
         r = get_redis_client()
         task_data = {
-            "task_id": job_id,
-            "raw_object": raw_r2_key,
-            "protected_object": protected_r2_key,
-            #"webhook_url": f"{request.url_root}api/internal/webhook",
-            # Replace 'a1b2-c3d4' with your actual Ngrok forwarding address
-            "webhook_url": " https://4cb5-61-12-82-214.ngrok-free.app/api/internal/webhook",
+            "task_id":        job_id,
+            "raw_object":     job.input_path,
+            "protected_object": job.output_path,
+            "webhook_url":    current_app.config.get('WEBHOOK_BASE_URL', '') + '/api/internal/webhook',
             "webhook_secret": current_app.config['WEBHOOK_SECRET']
         }
         r.rpush("vigilant_video_queue", json.dumps(task_data))
         r.set(f"status:{job_id}", "queued")
     except Exception as e:
         app.logger.error(f"Redis dispatch failed: {e}")
-        # Rollback: delete from R2 and DB so we don't have orphaned files/jobs
-        s3.delete_object(Bucket=bucket, Key=raw_r2_key)
-        db.session.delete(job)
-        db.session.commit()
-        return jsonify({'message': 'Our processing queue is temporarily unavailable. Please try again in a few minutes.'}), 503
+        # Don't delete the job — an admin can re-queue manually.
+        # But do signal the client so it can retry.
+        return jsonify({'message': 'Processing queue temporarily unavailable. Please try again in a few minutes.'}), 503
 
     return jsonify({
-        'job_id': job_id,
-        'status': 'pending',
-        'message': 'Upload received. Dispatched to GPU worker queue.',
+        'job_id':  job_id,
+        'status':  'pending',
+        'message': 'Upload confirmed. Dispatched to GPU worker queue.',
     }), 202
+
 
 # ══════════════════════════════════════════════════════════════════════
 # API — WEBHOOK (CALLED BY EXTERNAL WORKERS)
@@ -350,25 +450,23 @@ def api_upload():
 @app.route('/api/internal/webhook', methods=['POST'])
 def webhook_job_complete():
     data = request.get_json(silent=True) or {}
-    
-    # Verify the secret to ensure users can't fake a completed job
+
     if data.get('webhook_secret') != current_app.config['WEBHOOK_SECRET']:
         return jsonify({"error": "Unauthorized"}), 403
 
-    job_id = data.get('task_id')
-    status = data.get('status') # 'done' or 'error'
+    job_id  = data.get('task_id')
+    status  = data.get('status')   # 'done' or 'error'
     metrics = data.get('metrics', {})
 
     job = ProtectionJob.query.filter_by(job_id=job_id).first()
     if not job:
         return jsonify({"error": "Job not found"}), 404
 
-    job.status = status
+    job.status       = status
     job.completed_at = datetime.utcnow()
     if status == 'error':
         job.error_message = data.get('error_message', 'Unknown GPU error')
     else:
-        # Save the processing metrics to the DB
         activation = WatermarkActivation.from_result(job.id, metrics)
         db.session.add(activation)
 
@@ -384,7 +482,7 @@ def api_status(job_id):
     user = get_current_user()
     job  = ProtectionJob.query.filter_by(job_id=job_id, user_id=user.id).first()
     if not job: return jsonify({'message': 'Job not found.'}), 404
-    
+
     try:
         r = get_redis_client()
         progress_str = r.get(f"progress:{job_id}")
@@ -406,13 +504,12 @@ def api_download(job_id):
     if not job or job.status != 'done':
         return jsonify({'message': 'Video not ready.'}), 404
 
-    # Generate Secure, Expiring Cloudflare R2 Download Link
     s3 = get_s3_client()
     try:
         presigned_url = s3.generate_presigned_url(
             'get_object',
             Params={'Bucket': current_app.config['R2_BUCKET_NAME'], 'Key': job.output_path},
-            ExpiresIn=3600 # Link expires in 1 hour
+            ExpiresIn=3600
         )
     except Exception as e:
         app.logger.error(f"Failed to generate download link: {e}")
@@ -436,16 +533,12 @@ def api_delete_video(job_id):
 
     s3 = get_s3_client()
     bucket = current_app.config['R2_BUCKET_NAME']
-    
+
     try:
-        # Delete protected output
         if job.output_path:
             s3.delete_object(Bucket=bucket, Key=job.output_path)
-            
-        # Delete raw input (prevents storage leaks from unprocessed or failed jobs)
         if job.input_path:
             s3.delete_object(Bucket=bucket, Key=job.input_path)
-            
     except Exception as e:
         app.logger.warning(f"Failed to delete {job.output_path} or {job.input_path} from R2: {e}")
 
@@ -457,5 +550,4 @@ def api_delete_video(job_id):
     return jsonify({'message': 'Video deleted successfully.'}), 200
 
 if __name__ == '__main__':
-    os.makedirs(app.config.get('UPLOAD_FOLDER', 'uploads'), exist_ok=True)
     app.run(debug=True)
