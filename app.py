@@ -315,75 +315,80 @@ def _time_ago(dt):
 @app.route('/api/upload', methods=['POST'])
 @login_required_api
 def api_upload():
-    user = get_current_user()
-    allowed, msg = check_upload_limit(user)
-    if not allowed: return jsonify({'message': msg}), 429
-
-    if 'video' not in request.files: return jsonify({'message': 'No file uploaded.'}), 400
-    f = request.files['video']
-    name = (f.filename or '').strip()
-    ext = name.rsplit('.', 1)[-1].lower() if '.' in name else ''
-    
-    if ext not in app.config.get('ALLOWED_EXTENSIONS', {'mp4', 'mov', 'avi', 'mkv'}):
-        return jsonify({'message': f'Unsupported format: .{ext}'}), 415
-
-    job_id = str(uuid.uuid4())
-    upload_dir = app.config.get('UPLOAD_FOLDER', 'uploads')
-    os.makedirs(upload_dir, exist_ok=True)
-    local_path = os.path.join(upload_dir, f'{job_id}.{ext}')
-    f.save(local_path)
-    file_size = os.path.getsize(local_path)
-
-    # 1. Upload Raw File to Cloudflare R2
-    s3 = get_s3_client()
-    bucket = current_app.config['R2_BUCKET_NAME']
-    raw_r2_key = f"raw/{job_id}.{ext}"
-    protected_r2_key = f"protected/{job_id}.{ext}"
-    
-    s3.upload_file(local_path, bucket, raw_r2_key)
-    os.remove(local_path) # Scorched earth: delete local file immediately
-
-    # 2. Save Pending Job in Database
-    job = ProtectionJob(
-        job_id=job_id,
-        user_id=user.id,
-        status='pending',
-        original_filename=name,
-        original_size_bytes=file_size,
-        input_path=raw_r2_key, 
-        output_path=protected_r2_key
-    )
-    db.session.add(job)
-    user.subscription.monthly_uploads_used += 1
-    db.session.commit()
-
-    # 3. Push to Upstash Redis with Failure Handling
     try:
-        r = get_redis_client()
-        task_data = {
-            "task_id": job_id,
-            "raw_object": raw_r2_key,
-            "protected_object": protected_r2_key,
-            #"webhook_url": f"{request.url_root}api/internal/webhook",
-            # Replace 'a1b2-c3d4' with your actual Ngrok forwarding address
-            "webhook_url": " https://4cb5-61-12-82-214.ngrok-free.app/api/internal/webhook",
-            "webhook_secret": current_app.config['WEBHOOK_SECRET']
-        }
-        r.rpush("vigilant_video_queue", json.dumps(task_data))
-        r.set(f"status:{job_id}", "queued")
-    except Exception as e:
-        app.logger.error(f"Redis dispatch failed: {e}")
-        # Rollback: delete from R2 and DB so we don't have orphaned files/jobs
-        s3.delete_object(Bucket=bucket, Key=raw_r2_key)
-        db.session.delete(job)
-        db.session.commit()
-        return jsonify({'message': 'Our processing queue is temporarily unavailable. Please try again in a few minutes.'}), 503
+        user = get_current_user()
+        allowed, msg = check_upload_limit(user)
+        if not allowed: return jsonify({'message': msg}), 429
 
-    return jsonify({
-        'job_id': job_id,
-        'status': 'pending',
-        'message': 'Upload received. Dispatched to GPU worker queue.',
-    }), 202
+        if 'video' not in request.files: return jsonify({'message': 'No file uploaded.'}), 400
+        f = request.files['video']
+        name = (f.filename or '').strip()
+        ext = name.rsplit('.', 1)[-1].lower() if '.' in name else ''
+        
+        if ext not in app.config.get('ALLOWED_EXTENSIONS', {'mp4', 'mov', 'avi', 'mkv'}):
+            return jsonify({'message': f'Unsupported format: .{ext}'}), 415
+
+        job_id = str(uuid.uuid4())
+        upload_dir = app.config.get('UPLOAD_FOLDER', 'uploads')
+        os.makedirs(upload_dir, exist_ok=True)
+        local_path = os.path.join(upload_dir, f'{job_id}.{ext}')
+        f.save(local_path)
+        file_size = os.path.getsize(local_path)
+
+        # 1. Upload Raw File to Cloudflare R2
+        s3 = get_s3_client()
+        bucket = current_app.config['R2_BUCKET_NAME']
+        raw_r2_key = f"raw/{job_id}.{ext}"
+        protected_r2_key = f"protected/{job_id}.{ext}"
+        
+        s3.upload_file(local_path, bucket, raw_r2_key)
+        os.remove(local_path) # Scorched earth: delete local file immediately
+
+        # 2. Save Pending Job in Database
+        job = ProtectionJob(
+            job_id=job_id,
+            user_id=user.id,
+            status='pending',
+            original_filename=name,
+            original_size_bytes=file_size,
+            input_path=raw_r2_key, 
+            output_path=protected_r2_key
+        )
+        db.session.add(job)
+        user.subscription.monthly_uploads_used += 1
+        db.session.commit()
+
+        # 3. Push to Upstash Redis with Failure Handling
+        try:
+            r = get_redis_client()
+            task_data = {
+                "task_id": job_id,
+                "raw_object": raw_r2_key,
+                "protected_object": protected_r2_key,
+                #"webhook_url": f"{request.url_root}api/internal/webhook",
+                # Replace 'a1b2-c3d4' with your actual Ngrok forwarding address
+                "webhook_url": " https://4cb5-61-12-82-214.ngrok-free.app/api/internal/webhook",
+                "webhook_secret": current_app.config['WEBHOOK_SECRET']
+            }
+            r.rpush("vigilant_video_queue", json.dumps(task_data))
+            r.set(f"status:{job_id}", "queued")
+        except Exception as e:
+            app.logger.error(f"Redis dispatch failed: {e}")
+            # Rollback: delete from R2 and DB so we don't have orphaned files/jobs
+            s3.delete_object(Bucket=bucket, Key=raw_r2_key)
+            db.session.delete(job)
+            db.session.commit()
+            return jsonify({'message': 'Our processing queue is temporarily unavailable. Please try again in a few minutes.'}), 503
+
+        return jsonify({
+            'job_id': job_id,
+            'status': 'pending',
+            'message': 'Upload received. Dispatched to GPU worker queue.',
+        }), 202
+    except Exception as e:
+        import traceback
+        app.logger.error(traceback.format_exc())
+        return jsonify({'message': f'Server Error: {str(e)}'}), 500
 
 # ══════════════════════════════════════════════════════════════════════
 # API — WEBHOOK (CALLED BY EXTERNAL WORKERS)
