@@ -22,6 +22,42 @@ from models import (
     DownloadLog, UsageLimit, WatermarkActivation
 )
 
+def seed_usage_limits():
+    plans = [
+        {
+            'plan':                      'free',
+            'max_videos_per_month':      3,
+            'max_video_length_secs':     120,           # 2 minutes
+            'max_file_size_bytes':       209_715_200,   # 200 MB
+            'adversarial_enabled':       False,
+            'freq_perturbation_enabled': False,
+            'processing_priority':       'low',
+        },
+        {
+            'plan':                      'pro',
+            'max_videos_per_month':      50,
+            'max_video_length_secs':     1_800,          # 30 minutes
+            'max_file_size_bytes':       1_073_741_824,  # 1 GB
+            'adversarial_enabled':       True,
+            'freq_perturbation_enabled': True,
+            'processing_priority':       'medium',
+        },
+        {
+            'plan':                      'business',
+            'max_videos_per_month':      -1,             # unlimited
+            'max_video_length_secs':     7_200,          # 2 hours
+            'max_file_size_bytes':       5_368_709_120,  # 5 GB
+            'adversarial_enabled':       True,
+            'freq_perturbation_enabled': True,
+            'processing_priority':       'high',
+        },
+    ]
+
+    for p in plans:
+        if not UsageLimit.query.get(p['plan']):
+            db.session.add(UsageLimit(**p))
+    db.session.commit()
+
 def create_app(env=None):
     app = Flask(__name__)
     env = env or os.environ.get('FLASK_ENV', 'default')
@@ -29,6 +65,7 @@ def create_app(env=None):
     db.init_app(app)
     with app.app_context():
         db.create_all()   # Create tables on startup if they don't exist
+        seed_usage_limits()
     return app
 
 app = create_app()
