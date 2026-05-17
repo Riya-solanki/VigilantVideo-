@@ -4,7 +4,7 @@ All 7 tables from the Database Plan, ready for SQLite (dev) and Supabase (prod).
 """
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
@@ -12,7 +12,6 @@ db = SQLAlchemy()
 
 # ══════════════════════════════════════════════════════════════════
 # TABLE 1: users
-# Replaces the in-memory `users = {}` dict in app.py
 # ══════════════════════════════════════════════════════════════════
 class User(db.Model):
     __tablename__ = 'users'
@@ -22,7 +21,7 @@ class User(db.Model):
     password_hash = db.Column(db.String(256), nullable=False)
     plan_tier     = db.Column(db.String(20),  default='free', nullable=False)
     is_active     = db.Column(db.Boolean,     default=True,  nullable=False)
-    created_at    = db.Column(db.DateTime,    default=datetime.utcnow, nullable=False)
+    created_at    = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     # ── Relationships ──────────────────────────────────────────────
     jobs          = db.relationship('ProtectionJob',  backref='user', lazy='dynamic')
@@ -35,7 +34,9 @@ class User(db.Model):
         return {
             'id':         self.id,
             'username':   self.username,
-            'plan_tier':  self.subscription.plan if self.subscription else 'free',  # ← single source
+            # Always read plan from subscription — the single source of truth.
+            # plan_tier column on User is never updated so should not be trusted.
+            'plan_tier':  self.subscription.plan if self.subscription else 'free',
             'is_active':  self.is_active,
             'created_at': self.created_at.isoformat(),
             'initials':   self.username[:2].upper(),
@@ -49,7 +50,8 @@ class User(db.Model):
     def get_upload_limit(self):
         if not self.subscription:
             return 3  # fallback to free
-        limit = UsageLimit.query.get(self.subscription.plan)
+        # FIX Bug 8: Replace deprecated .query.get() with db.session.get()
+        limit = db.session.get(UsageLimit, self.subscription.plan)
         return limit.max_videos_per_month if limit else 3
 
     def __repr__(self):
@@ -68,15 +70,15 @@ class ProtectionJob(db.Model):
     job_id              = db.Column(db.String(36), unique=True, nullable=False, index=True)
     user_id             = db.Column(db.Integer,    db.ForeignKey('users.id'), nullable=False)
     status              = db.Column(db.String(20), nullable=False, default='pending')
-    # status values: pending | processing | done | error
+    # status values: pending_presign | pending | processing | done | error | expired
 
     error_message       = db.Column(db.Text,       nullable=True)
     original_filename   = db.Column(db.String(255), nullable=False)
     original_size_bytes = db.Column(db.BigInteger,  nullable=True)
-    input_path          = db.Column(db.String(500), nullable=True)   # upload path / Cloudinary URL
-    output_path         = db.Column(db.String(500), nullable=True)   # protected video path / URL
+    input_path          = db.Column(db.String(500), nullable=True)
+    output_path         = db.Column(db.String(500), nullable=True)
 
-    created_at          = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at          = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     completed_at        = db.Column(db.DateTime, nullable=True)
 
     # ── Relationships ──────────────────────────────────────────────
@@ -115,9 +117,7 @@ class ProtectionJob(db.Model):
 # ══════════════════════════════════════════════════════════════════
 # TABLE 3: watermark_activations
 # Stores the full output of protect_video() from protection.py
-# ═════════════════════════════════════════════════════════
-# 
-# ═════════
+# ══════════════════════════════════════════════════════════════════
 class WatermarkActivation(db.Model):
     __tablename__ = 'watermark_activations'
 
@@ -135,7 +135,7 @@ class WatermarkActivation(db.Model):
     _protections_applied      = db.Column('protections_applied', db.Text, nullable=True)
     _models_used              = db.Column('models_used',          db.Text, nullable=True)
 
-    created_at                = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at                = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     # ── JSON helpers ───────────────────────────────────────────────
     @property
@@ -190,7 +190,7 @@ class DownloadLog(db.Model):
     job_id        = db.Column(db.Integer,    db.ForeignKey('protection_jobs.id'), nullable=False)
     user_id       = db.Column(db.Integer,    db.ForeignKey('users.id'),           nullable=False)
     ip_address    = db.Column(db.String(45), nullable=True)
-    downloaded_at = db.Column(db.DateTime,   default=datetime.utcnow, nullable=False)
+    downloaded_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     def to_dict(self):
         return {
@@ -206,7 +206,7 @@ class DownloadLog(db.Model):
 
 # ══════════════════════════════════════════════════════════════════
 # TABLE 5: user_feedback
-# Optional — add when you want ratings/bug reports
+# Optional — ratings / bug reports from users
 # ══════════════════════════════════════════════════════════════════
 class UserFeedback(db.Model):
     __tablename__ = 'user_feedback'
@@ -217,7 +217,7 @@ class UserFeedback(db.Model):
     rating     = db.Column(db.Integer,    nullable=True)     # 1–5
     category   = db.Column(db.String(50), nullable=True)     # quality / speed / bug_report / etc.
     comment    = db.Column(db.Text,       nullable=True)
-    created_at = db.Column(db.DateTime,   default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     def __repr__(self):
         return f'<UserFeedback user_id={self.user_id} rating={self.rating}>'
@@ -234,11 +234,10 @@ class Subscription(db.Model):
     user_id              = db.Column(db.Integer,    db.ForeignKey('users.id'), nullable=False, unique=True)
     plan                 = db.Column(db.String(20), nullable=False, default='free')
     is_active            = db.Column(db.Boolean,    default=True,  nullable=False)
-    payment_method       = db.Column(db.String(50), nullable=True)   # stripe / razorpay / etc.
+    payment_method       = db.Column(db.String(50), nullable=True)
     monthly_uploads_used = db.Column(db.Integer,    default=0,     nullable=False)
-    started_at           = db.Column(db.DateTime,   default=datetime.utcnow, nullable=False)
+    started_at           = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     expires_at           = db.Column(db.DateTime,   nullable=True)
-
 
     def reset_monthly_counter(self):
         """Call this on a monthly cron job to reset upload counts."""

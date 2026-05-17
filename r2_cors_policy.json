@@ -1,0 +1,25 @@
+# CORS policy for vigilant-video-bucket
+# Paste this into Cloudflare R2 > vigilant-video-bucket > Settings > CORS Policy
+
+[
+  {
+    "AllowedOrigins": [
+      "http://localhost:5000",
+      "http://127.0.0.1:5000"
+    ],
+    "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
+    "AllowedHeaders": [
+      "Content-Type",
+      "Content-Length",
+      "Authorization",
+      "x-amz-date",
+      "x-amz-content-sha256",
+      "x-amz-security-token",
+      "x-amz-algorithm",
+      "x-amz-credential",
+      "x-amz-signature"
+    ],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]

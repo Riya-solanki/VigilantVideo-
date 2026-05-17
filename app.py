@@ -4,8 +4,12 @@ app.py — Vigilant Video — Main Flask Application
 import os
 import uuid
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
+
+# Load .env into os.environ BEFORE config.py reads it
+from dotenv import load_dotenv
+load_dotenv()
 
 import boto3
 from botocore.client import Config  # Required for R2 signature version
@@ -21,6 +25,18 @@ from models import (
     db, User, ProtectionJob, Subscription,
     DownloadLog, UsageLimit, WatermarkActivation
 )
+
+# ── FIX Bug 1: Correct MIME types for all supported video formats ──────────
+# video/mov, video/avi, video/mkv are NOT valid MIME types.
+# R2 enforces the Content-Type in the presigned POST policy, so a wrong MIME
+# type causes R2 to reject the upload immediately — this was the upload error.
+MIME_TYPES = {
+    'mp4': 'video/mp4',
+    'mov': 'video/quicktime',
+    'avi': 'video/x-msvideo',
+    'mkv': 'video/x-matroska',
+}
+
 
 def _seed_usage_limits():
     """
@@ -59,7 +75,8 @@ def _seed_usage_limits():
     ]
     inserted = 0
     for p in plans:
-        if not UsageLimit.query.get(p['plan']):
+        # FIX Bug 8: Replace deprecated .query.get() with db.session.get()
+        if not db.session.get(UsageLimit, p['plan']):
             db.session.add(UsageLimit(**p))
             inserted += 1
     if inserted:
@@ -98,7 +115,8 @@ def get_redis_client():
 # ══════════════════════════════════════════════════════════════════════
 def get_current_user():
     uid = session.get('user_id')
-    return User.query.get(uid) if uid else None
+    # FIX Bug 8: Replace deprecated User.query.get() with db.session.get()
+    return db.session.get(User, uid) if uid else None
 
 def login_required_api(f):
     @wraps(f)
@@ -114,17 +132,22 @@ def check_upload_limit(user):
     sub = user.subscription
 
     # ── Lazy monthly reset ──────────────────────────────────────────
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     period_start = sub.started_at or now
+    # Ensure period_start is timezone-aware (legacy rows in SQLite may be naive)
+    if hasattr(period_start, 'tzinfo') and period_start.tzinfo is None:
+        period_start = period_start.replace(tzinfo=timezone.utc)
     if now.year > period_start.year or now.month > period_start.month:
         sub.monthly_uploads_used = 0
         sub.started_at = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         db.session.commit()
 
-    limit = UsageLimit.query.get(sub.plan)
-    if not limit: 
-        seed_usage_limits()
-        limit = UsageLimit.query.get(sub.plan)
+    # FIX Bug 8: Replace deprecated .query.get() with db.session.get()
+    limit = db.session.get(UsageLimit, sub.plan)
+    if not limit:
+        # FIX Bug 2: Was calling undefined seed_usage_limits() — correct name is _seed_usage_limits()
+        _seed_usage_limits()
+        limit = db.session.get(UsageLimit, sub.plan)
         if not limit:
             return False, f"Plan '{sub.plan}' not found."
     if limit.max_videos_per_month == -1: return True, 'ok'
@@ -204,6 +227,12 @@ def api_me():
         return jsonify({'message': 'Not authenticated.'}), 401
     return jsonify({'user': user.to_dict()}), 200
 
+@app.route('/api/plans', methods=['GET'])
+def api_plans():
+    """Return all available plan tiers for the upgrade modal."""
+    plans = UsageLimit.query.all()
+    return jsonify({'plans': [p.to_dict() for p in plans]}), 200
+
 # ══════════════════════════════════════════════════════════════════════
 # API — DASHBOARD DATA
 # ══════════════════════════════════════════════════════════════════════
@@ -219,7 +248,11 @@ def api_dashboard():
     processing_now    = sum(1 for j in jobs if j.status in ('pending', 'processing'))
     storage_used      = sum(j.original_size_bytes or 0 for j in jobs)
 
-    limit_row = UsageLimit.query.get(user.plan_tier)
+    # FIX Bug 3: user.plan_tier column is never updated when plan changes.
+    # Always read the plan from user.subscription.plan — the single source of truth.
+    plan = user.subscription.plan if user.subscription else 'free'
+    # FIX Bug 8: Replace deprecated .query.get() with db.session.get()
+    limit_row = db.session.get(UsageLimit, plan)
     storage_limit = (limit_row.max_file_size_bytes
                      if limit_row and limit_row.max_file_size_bytes != -1
                      else 10 * 1024 ** 3)
@@ -233,7 +266,7 @@ def api_dashboard():
         if (
             j.status == 'done'
             and j.completed_at
-            and datetime.utcnow() - j.completed_at > timedelta(days=3)
+            and datetime.now(timezone.utc) - j.completed_at.replace(tzinfo=timezone.utc) > timedelta(days=3)
         ):
             try:
                 if j.output_path:
@@ -300,7 +333,11 @@ def api_dashboard():
 def _time_ago(dt):
     if not dt:
         return ''
-    diff = datetime.utcnow() - dt
+    now = datetime.now(timezone.utc)
+    # Make dt timezone-aware if it isn't already (handles legacy naive datetimes in DB)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    diff = now - dt
     secs = int(diff.total_seconds())
     if secs < 60:    return 'Just now'
     if secs < 3600:  return f'{secs // 60} min ago'
@@ -332,8 +369,10 @@ def api_presign_upload():
     if ext not in app.config.get('ALLOWED_EXTENSIONS', {'mp4', 'mov', 'avi', 'mkv'}):
         return jsonify({'message': f'Unsupported format: .{ext}'}), 415
 
-    # Check per-plan file size limit
-    limit_row = UsageLimit.query.get(user.plan_tier)
+    # FIX Bug 3: Read plan from subscription, not stale plan_tier column
+    plan = user.subscription.plan if user.subscription else 'free'
+    # FIX Bug 8: Replace deprecated .query.get() with db.session.get()
+    limit_row = db.session.get(UsageLimit, plan)
     if limit_row and limit_row.max_file_size_bytes != -1:
         if filesize > limit_row.max_file_size_bytes:
             return jsonify({'message': 'File exceeds your plan\'s size limit.'}), 413
@@ -342,8 +381,11 @@ def api_presign_upload():
     raw_r2_key       = f"raw/{job_id}.{ext}"
     protected_r2_key = f"protected/{job_id}.{ext}"
 
-    # Generate a presigned POST — valid for 15 minutes.
-    # The browser will POST the file directly to R2 using these credentials.
+    # FIX Bug 1: Use correct MIME type from the MIME_TYPES map.
+    # video/mov, video/avi, video/mkv are not valid — R2 rejects uploads
+    # when the browser's Content-Type doesn't match the presigned policy.
+    mime = MIME_TYPES.get(ext, f'video/{ext}')
+
     s3 = get_s3_client()
     bucket = current_app.config['R2_BUCKET_NAME']
 
@@ -352,11 +394,11 @@ def api_presign_upload():
             Bucket=bucket,
             Key=raw_r2_key,
             Fields={
-                'Content-Type': f'video/{ext}',
+                'Content-Type': mime,
             },
             Conditions=[
                 ['content-length-range', 1, app.config.get('MAX_UPLOAD_BYTES', 5 * 1024 ** 3)],
-                {'Content-Type': f'video/{ext}'},
+                {'Content-Type': mime},
             ],
             ExpiresIn=900  # 15 minutes
         )
@@ -375,8 +417,10 @@ def api_presign_upload():
         output_path=protected_r2_key
     )
     db.session.add(job)
-    # Increment quota now — rolled back in /confirm if upload never completes.
-    user.subscription.monthly_uploads_used += 1
+    # FIX Bug 5: Do NOT increment quota here at presign time.
+    # If the user closes the tab or the R2 upload fails, /confirm is never
+    # called and the quota would be permanently wasted.
+    # Quota is now incremented in /confirm only after the file lands in R2.
     db.session.commit()
 
     return jsonify({
@@ -407,18 +451,21 @@ def api_confirm_upload():
     if job.status != 'pending_presign':
         return jsonify({'message': 'Job already confirmed or invalid state.'}), 409
 
-    # Optionally verify the object actually landed in R2 before queuing.
+    # Verify the object actually landed in R2 before queuing.
     # This prevents someone calling /confirm without actually uploading.
     s3 = get_s3_client()
     bucket = current_app.config['R2_BUCKET_NAME']
     try:
         s3.head_object(Bucket=bucket, Key=job.input_path)
     except Exception:
-        # Object not found — roll back the quota increment and delete the phantom job.
-        user.subscription.monthly_uploads_used = max(0, user.subscription.monthly_uploads_used - 1)
+        # Object not found — delete the phantom job. No quota was charged yet.
         db.session.delete(job)
         db.session.commit()
         return jsonify({'message': 'Upload not found in storage. Please try again.'}), 404
+
+    # FIX Bug 5: Increment quota here, only after the file is confirmed in R2.
+    # This ensures cancelled / failed uploads never consume quota.
+    user.subscription.monthly_uploads_used += 1
 
     # Transition to proper 'pending' and push to the GPU worker queue.
     job.status = 'pending'
@@ -438,13 +485,101 @@ def api_confirm_upload():
     except Exception as e:
         app.logger.error(f"Redis dispatch failed: {e}")
         # Don't delete the job — an admin can re-queue manually.
-        # But do signal the client so it can retry.
         return jsonify({'message': 'Processing queue temporarily unavailable. Please try again in a few minutes.'}), 503
 
     return jsonify({
         'job_id':  job_id,
         'status':  'pending',
         'message': 'Upload confirmed. Dispatched to GPU worker queue.',
+    }), 202
+
+
+# ══════════════════════════════════════════════════════════════════════
+# API — STEP 1 OF 1 (STREAM): Browser → Flask → R2 (no CORS required)
+# Use this route when R2 CORS can't be configured (e.g. local dev).
+# The browser POSTs the video file to Flask as multipart/form-data.
+# Flask streams it straight to R2 via boto3, then queues the GPU job.
+# ══════════════════════════════════════════════════════════════════════
+@app.route('/api/upload/stream', methods=['POST'])
+@login_required_api
+def api_stream_upload():
+    user = get_current_user()
+
+    # ── Quota check (same as presign route) ───────────────────────────
+    allowed, msg = check_upload_limit(user)
+    if not allowed:
+        return jsonify({'message': msg}), 429
+
+    file = request.files.get('file')
+    if not file or file.filename == '':
+        return jsonify({'message': 'No file provided.'}), 400
+
+    filename = file.filename.strip()
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+    if ext not in app.config.get('ALLOWED_EXTENSIONS', {'mp4', 'mov', 'avi', 'mkv'}):
+        return jsonify({'message': f'Unsupported format: .{ext}'}), 415
+
+    # ── Size check ────────────────────────────────────────────────────
+    plan      = user.subscription.plan if user.subscription else 'free'
+    limit_row = db.session.get(UsageLimit, plan)
+    file.stream.seek(0, 2)
+    filesize = file.stream.tell()
+    file.stream.seek(0)
+    if limit_row and limit_row.max_file_size_bytes != -1:
+        if filesize > limit_row.max_file_size_bytes:
+            return jsonify({'message': "File exceeds your plan's size limit."}), 413
+
+    job_id           = str(uuid.uuid4())
+    raw_r2_key       = f"raw/{job_id}.{ext}"
+    protected_r2_key = f"protected/{job_id}.{ext}"
+    mime             = MIME_TYPES.get(ext, f'video/{ext}')
+
+    # ── Stream file to R2 (server-side — no browser CORS involved) ────
+    s3     = get_s3_client()
+    bucket = current_app.config['R2_BUCKET_NAME']
+    try:
+        s3.upload_fileobj(
+            file.stream, bucket, raw_r2_key,
+            ExtraArgs={'ContentType': mime}
+        )
+    except Exception as e:
+        app.logger.error(f"Stream upload to R2 failed: {e}")
+        return jsonify({'message': 'Upload to storage failed. Please try again.'}), 500
+
+    # ── Create DB job and increment quota ─────────────────────────────
+    job = ProtectionJob(
+        job_id=job_id,
+        user_id=user.id,
+        status='pending',
+        original_filename=filename,
+        original_size_bytes=filesize,
+        input_path=raw_r2_key,
+        output_path=protected_r2_key,
+    )
+    db.session.add(job)
+    user.subscription.monthly_uploads_used += 1
+    db.session.commit()
+
+    # ── Push to Redis GPU worker queue ────────────────────────────────
+    try:
+        r = get_redis_client()
+        task_data = {
+            "task_id":          job_id,
+            "raw_object":       raw_r2_key,
+            "protected_object": protected_r2_key,
+            "webhook_url":      current_app.config.get('WEBHOOK_BASE_URL', '') + '/api/internal/webhook',
+            "webhook_secret":   current_app.config['WEBHOOK_SECRET'],
+        }
+        r.rpush("vigilant_video_queue", json.dumps(task_data))
+        r.set(f"status:{job_id}", "queued")
+    except Exception as e:
+        app.logger.error(f"Redis dispatch failed: {e}")
+        return jsonify({'message': 'Processing queue temporarily unavailable. Please try again.'}), 503
+
+    return jsonify({
+        'job_id':  job_id,
+        'status':  'pending',
+        'message': 'Upload complete. Dispatched to GPU worker queue.',
     }), 202
 
 
@@ -467,7 +602,7 @@ def webhook_job_complete():
         return jsonify({"error": "Job not found"}), 404
 
     job.status       = status
-    job.completed_at = datetime.utcnow()
+    job.completed_at = datetime.now(timezone.utc)
     if status == 'error':
         job.error_message = data.get('error_message', 'Unknown GPU error')
     else:

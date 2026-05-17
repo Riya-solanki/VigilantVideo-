@@ -1,3 +1,4 @@
+
 import os
 import json
 import redis
@@ -55,12 +56,9 @@ def worker_loop():
                 # 4. Download from Cloudflare R2
                 s3.download_file(BUCKET_NAME, raw_object, local_input)
                 
-                def progress_cb(pct):
-                    r.set(f"progress:{task_id}", pct, ex=3600)
-                
                 # 5. Execute your optimized GPU pipeline and capture metrics
                 print(f"⚙️ Running GPU pipeline...")
-                metrics = protect_video_gpu(local_input, local_output, batch_size=16, progress_callback=progress_cb)
+                metrics = protect_video_gpu(local_input, local_output, batch_size=16)
                 
                 # 6. Upload the protected video back to Cloudflare R2
                 print(f"📤 Uploading Protected Video {task_id} to R2...")

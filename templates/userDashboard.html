@@ -48,6 +48,11 @@
         <div class="live-badge">Live</div>
       </div>
       <div class="topbar-right">
+        <!-- Plan quota pill — populated by JS -->
+        <div class="plan-pill" id="planPill" onclick="openUpgradeModal()" title="Click to view upgrade options">
+          <span class="plan-pill-badge" id="planBadge">FREE</span>
+          <span class="plan-pill-usage" id="planUsage">0/3 uploads</span>
+        </div>
         <!-- Added Sign Out button here -->
         <button class="tb-btn" onclick="openLogoutModal()">Sign Out</button>
         <button class="tb-btn primary" onclick="openUploadModal()">
@@ -105,7 +110,9 @@
                 <div class="panel-title">Video Library</div>
               </div>
               <div style="display:flex;align-items:center;gap:1rem;">
-                <span class="panel-meta" id="libTotal">24 total</span>
+                <span class="panel-meta" id="libTotal">0 total</span>
+                <!-- libCount is read by JS to update badge counts -->
+                <span id="libCount" style="display:none">0</span>
                 <a href="#" class="panel-link" onclick="return false;">View all</a>
               </div>
             </div>
@@ -141,14 +148,28 @@
           <div class="panel">
             <div class="panel-head">
               <div class="panel-title">Processing Queue</div>
-              
+              <!-- jobCount and queueCount are updated by renderQueue() -->
+              <span class="panel-meta" id="jobCount">0 jobs</span>
             </div>
             <div class="queue-body" id="queueBody">
               <!-- Populated by JS -->
             </div>
+            <!-- Hidden numeric badge referenced by JS -->
+            <span id="queueCount" style="display:none">0</span>
           </div>
-  
-          <!-- ADD THIS AT THE BOTTOM OF YOUR RIGHT COLUMN (Below Activity Feed) -->
+
+          <!-- ACTIVITY FEED -->
+          <div class="panel">
+            <div class="panel-head">
+              <div class="panel-title">Activity Feed</div>
+            </div>
+            <div class="queue-body" id="feedBody">
+              <!-- Populated by JS renderFeed() -->
+            </div>
+          </div>
+
+          <!-- COMMUNITY FEEDBACK -->
+
           <div class="panel feedback-card" style="border: 1px dashed var(--cyan); background: rgba(0, 255, 255, 0.03);">
             <div class="panel-head">
               <div class="panel-title" style="color: var(--cyan);">Community Feedback</div>
@@ -207,6 +228,31 @@
       <button class="lc-btn cancel" onclick="closeLogoutModal()">Cancel</button>
       <button class="lc-btn confirm" onclick="doLogout()">Sign Out</button>
     </div>
+  </div>
+</div>
+
+<!-- ══ UPGRADE MODAL ══ -->
+<div id="upgradeModal" class="upgrade-overlay">
+  <div class="upgrade-card">
+    <!-- Close -->
+    <button class="upgrade-close" onclick="closeUpgradeModal()">✕</button>
+
+    <!-- Header -->
+    <div class="upgrade-header">
+      <div class="upgrade-lock-icon">🔒</div>
+      <div class="upgrade-title">YOU'VE HIT YOUR FREE LIMIT</div>
+      <p class="upgrade-sub">Your free plan allows <strong>3 videos per month</strong>. Upgrade to keep your content protected without limits.</p>
+    </div>
+
+    <!-- Plan cards -->
+    <div class="upgrade-plans" id="upgradePlans">
+      <!-- Populated by JS -->
+      <div class="upgrade-plan-skeleton"></div>
+      <div class="upgrade-plan-skeleton"></div>
+    </div>
+
+    <!-- Footer -->
+    <p class="upgrade-footer">Plans renew monthly. Cancel anytime. Questions? <a href="mailto:support@vigilantvideo.ai">Contact us</a>.</p>
   </div>
 </div>
 

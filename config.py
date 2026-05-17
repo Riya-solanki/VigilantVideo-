@@ -32,9 +32,11 @@ class Config:
     REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379')
 
     # ── File Uploads ───────────────────────────────────────────────────
-    # MAX_CONTENT_LENGTH is intentionally kept small — Render only receives
-    # JSON metadata now (presign step), never raw video bytes.
-    MAX_CONTENT_LENGTH = 1 * 1024 * 1024   # 1 MB (JSON requests only)
+    # MAX_CONTENT_LENGTH caps the total request body Flask will accept.
+    # For the presigned-POST flow this was 1 MB (JSON only).
+    # For the direct stream-upload fallback (/api/upload/stream) it must
+    # be at least as large as the biggest allowed file.
+    MAX_CONTENT_LENGTH = 1 * 1024 * 1024   # 1 MB default (JSON requests)
 
     # MAX_UPLOAD_BYTES is the limit enforced inside the presigned POST
     # policy sent to R2.  R2 will reject uploads larger than this.
@@ -50,6 +52,12 @@ class Config:
 
 class DevelopmentConfig(Config):
     DEBUG = True
+    # Override to accept full video files via /api/upload/stream
+    # (avoids R2 CORS issues in local dev — browser uploads to Flask instead).
+    MAX_CONTENT_LENGTH = 210 * 1024 * 1024  # 210 MB — covers free-plan 200 MB limit
+    # Fallback so the Kaggle worker webhook always has a valid base URL locally.
+    # Override in .env with your ngrok URL when Kaggle needs to reach this server.
+    WEBHOOK_BASE_URL = os.environ.get('WEBHOOK_BASE_URL', 'http://127.0.0.1:5000')
 
 
 class ProductionConfig(Config):
