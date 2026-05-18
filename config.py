@@ -15,11 +15,23 @@ class Config:
     WEBHOOK_BASE_URL = os.environ.get('WEBHOOK_BASE_URL', '')
 
     # ── Database ───────────────────────────────────────────────────────
-    SQLALCHEMY_DATABASE_URI    = os.environ.get('DATABASE_URL', 'sqlite:///vigilant.db')
+    # Supports both SQLite (local dev, no DATABASE_URL) and Neon PostgreSQL
+    # (set DATABASE_URL=postgresql+psycopg2://... in .env or environment).
+    _db_url = os.environ.get('DATABASE_URL', 'sqlite:///vigilant.db')
+    # Neon (and Heroku) sometimes return postgres:// — SQLAlchemy requires postgresql://
+    if _db_url.startswith('postgres://'):
+        _db_url = _db_url.replace('postgres://', 'postgresql+psycopg2://', 1)
+    SQLALCHEMY_DATABASE_URI    = _db_url
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS  = {
-        'pool_pre_ping': True,
-        'pool_recycle':  300,
+        'pool_pre_ping':  True,   # drops stale connections before use
+        'pool_recycle':   300,    # recycle connections every 5 min (Neon idle timeout)
+        'pool_size':      5,      # keep at most 5 live connections (Neon free = 10 max)
+        'max_overflow':   2,      # allow 2 extra burst connections
+        'connect_args':   {
+            # Neon enforces TLS — psycopg2 must use SSL
+            'sslmode': 'require',
+        },
     }
 
     # ── Cloudflare R2 ──────────────────────────────────────────────────
