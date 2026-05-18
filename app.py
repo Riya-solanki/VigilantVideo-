@@ -544,7 +544,8 @@ def api_stream_upload():
         )
     except Exception as e:
         app.logger.error(f"Stream upload to R2 failed: {e}")
-        return jsonify({'message': 'Upload to storage failed. Please try again.'}), 500
+        # Expose real error temporarily for debugging — revert before production
+        return jsonify({'message': f'Upload to storage failed: {str(e)}'}), 500
 
     # ── Create DB job and increment quota ─────────────────────────────
     job = ProtectionJob(
