@@ -182,7 +182,7 @@ function renderTable() {
       actionCell = `<span style="font-size:0.75rem;color:var(--muted)">Upload in progress…</span>`;
     } else {
       // covers 'pending' (queued for GPU worker)
-      statusPill = `<span class="pill queued"><span class="pill-dot"></span>Queued</span>`;
+      statusPill = `<span class="pill queued"><span class="pill-dot"></span>Processing</span>`;
       actionCell = `<span style="font-size:0.75rem;color:var(--muted)">Waiting...</span>`;
     }
     return `<tr>
