@@ -15,4 +15,5 @@ python-dotenv==1.0.1
 gunicorn==21.2.0  # Required for production deployment (e.g., Render, Heroku)
 
 # Payment Gateway
+setuptools>=68.0.0   # provides pkg_resources needed by razorpay on Python 3.12+
 razorpay==1.4.2
