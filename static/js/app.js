@@ -3,6 +3,19 @@
 // ══════════════════════════════════════
 const navbar = document.getElementById('navbar');
 if (navbar) {
+
+// ── Mobile hamburger toggle ────────────────────────────────────
+const navToggle = document.getElementById('navToggle');
+if (navToggle) {
+  navToggle.addEventListener('click', () => {
+    navbar.classList.toggle('open');
+  });
+
+  // Close menu when a nav link is clicked
+  navbar.querySelectorAll('.nav-links a').forEach(link => {
+    link.addEventListener('click', () => navbar.classList.remove('open'));
+  });
+}
   window.addEventListener('scroll', () => {
     navbar.classList.toggle('scrolled', window.scrollY > 30);
   });

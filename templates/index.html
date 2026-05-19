@@ -11,7 +11,6 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
 <!-- Razorpay Checkout SDK -->
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-<script type="module" src="{{ url_for('static', filename='js/firebase-analytics.js') }}"></script>
 </head>
 <body>
 
@@ -29,6 +28,13 @@
     </div>
     <span class="nav-logo-text">Vigilant<span>Video</span></span>
   </a>
+
+  <!-- Mobile hamburger -->
+  <button class="nav-hamburger" id="navToggle" aria-label="Toggle menu">
+    <span></span>
+    <span></span>
+    <span></span>
+  </button>
 
   <div class="nav-links">
     <a href="{{ url_for('dashboard') }}">Dashboard</a>
@@ -237,11 +243,6 @@
             <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.04);font-size:0.72rem;color:var(--text-secondary)">Stable Diffusion</span>
             <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.04);font-size:0.72rem;color:var(--text-secondary)">DALL-E 3</span>
             <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.04);font-size:0.72rem;color:var(--text-secondary)">Sora</span>
-            <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.04);font-size:0.72rem;color:var(--text-secondary)">MidJourney</span>
-            <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.04);font-size:0.72rem;color:var(--text-secondary)">Gen-2</span>
-            <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.04);font-size:0.72rem;color:var(--text-secondary)">Pika</span>
-            <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.04);font-size:0.72rem;color:var(--text-secondary)">OpenCLIP</span>
-            <span style="padding:3px 10px;border-radius:5px;background:rgba(255,255,255,0.04);font-size:0.72rem;color:var(--text-secondary)">DINO v2</span>
           </div>
         </div>
       </div>
@@ -406,7 +407,7 @@
     <!-- Business Plan -->
     <div class="step-card price-card">
       <div class="step-num">Business</div>
-      <div class="price-value">₹12,400<span>/mo</span></div>
+      <div class="price-value">$149<span>/mo</span></div>
       <h3 class="step-title">Studio</h3>
       <ul class="price-list">
         <li>Unlimited uploads/month</li>

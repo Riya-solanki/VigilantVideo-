@@ -1371,14 +1371,100 @@ footer {
     }
 }
 
+/* ── Hamburger button (hidden on desktop) ── */
+.nav-hamburger {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px 4px;
+    z-index: 101;
+    flex-shrink: 0;
+}
+
+.nav-hamburger span {
+    display: block;
+    width: 22px;
+    height: 2px;
+    background: var(--text-secondary);
+    border-radius: 99px;
+    transition: all 0.3s var(--ease);
+    transform-origin: center;
+}
+
 @media(max-width: 768px) {
     nav {
         padding: 0 4%;
-        height: 56px;
+        min-height: 56px;
+        height: auto;
+        flex-wrap: wrap;
+        align-items: center;
     }
 
+    /* Show hamburger */
+    .nav-hamburger {
+        display: flex;
+    }
+
+    /* Hide links by default on mobile */
     .nav-links {
         display: none;
+        flex-direction: column;
+        width: 100%;
+        gap: 0;
+        padding: 0.5rem 0 1rem;
+        border-top: 1px solid var(--border);
+        order: 3;
+    }
+
+    .nav-links a {
+        padding: 0.75rem 0;
+        font-size: 0.95rem;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .nav-links a::after {
+        display: none;
+    }
+
+    /* Hide CTA buttons by default on mobile */
+    .nav-cta {
+        display: none;
+        flex-direction: column;
+        width: 100%;
+        gap: 0.5rem;
+        padding: 0.75rem 0 1rem;
+        order: 4;
+    }
+
+    .nav-cta .btn-nav {
+        width: 100%;
+        text-align: center;
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+    }
+
+    /* Show links and CTA when nav is open */
+    nav.open .nav-links,
+    nav.open .nav-cta {
+        display: flex;
+    }
+
+    /* Animate hamburger → X when open */
+    nav.open .nav-hamburger span:nth-child(1) {
+        transform: translateY(7px) rotate(45deg);
+    }
+
+    nav.open .nav-hamburger span:nth-child(2) {
+        opacity: 0;
+        transform: scaleX(0);
+    }
+
+    nav.open .nav-hamburger span:nth-child(3) {
+        transform: translateY(-7px) rotate(-45deg);
     }
 
     .hero-float {
