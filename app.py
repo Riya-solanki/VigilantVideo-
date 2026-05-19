@@ -4,8 +4,12 @@ app.py — Vigilant Video — Main Flask Application
 import os
 import uuid
 import json
+import hmac
+import hashlib
 from datetime import datetime, timedelta, timezone
 from functools import wraps
+
+import razorpay
 
 # Load .env into os.environ BEFORE config.py reads it
 from dotenv import load_dotenv
@@ -544,8 +548,7 @@ def api_stream_upload():
         )
     except Exception as e:
         app.logger.error(f"Stream upload to R2 failed: {e}")
-        # Expose real error temporarily for debugging — revert before production
-        return jsonify({'message': f'Upload to storage failed: {str(e)}'}), 500
+        return jsonify({'message': 'Upload to storage failed. Please try again.'}), 500
 
     # ── Create DB job and increment quota ─────────────────────────────
     job = ProtectionJob(
@@ -688,6 +691,154 @@ def api_delete_video(job_id):
     db.session.commit()
 
     return jsonify({'message': 'Video deleted successfully.'}), 200
+
+# ══════════════════════════════════════════════════════════════════════
+# API — PAYMENT (RAZORPAY)
+# ══════════════════════════════════════════════════════════════════════
+
+# Plan pricing in INR paise (1 INR = 100 paise)
+PLAN_PRICES = {
+    'pro':      {'amount': 240000,  'label': 'Pro Plan — ₹2,400/month'},
+    'business': {'amount': 1240000, 'label': 'Business Plan — ₹12,400/month'},
+}
+
+def get_razorpay_client():
+    return razorpay.Client(
+        auth=(current_app.config['RAZORPAY_KEY_ID'],
+              current_app.config['RAZORPAY_KEY_SECRET'])
+    )
+
+
+@app.route('/api/payment/create-order', methods=['POST'])
+@login_required_api
+def api_create_order():
+    """
+    Step 1 — Create a Razorpay order server-side.
+    Returns order_id + amount so the frontend can open the Razorpay checkout popup.
+    """
+    data = request.get_json(silent=True) or {}
+    plan = (data.get('plan') or '').lower().strip()
+
+    if plan not in PLAN_PRICES:
+        return jsonify({'message': f"Unknown plan '{plan}'. Choose 'pro' or 'business'."}), 400
+
+    if not current_app.config.get('RAZORPAY_KEY_ID') or not current_app.config.get('RAZORPAY_KEY_SECRET'):
+        return jsonify({'message': 'Payment gateway not configured. Please contact support.'}), 503
+
+    price_info = PLAN_PRICES[plan]
+    rz = get_razorpay_client()
+
+    try:
+        order = rz.order.create({
+            'amount':   price_info['amount'],
+            'currency': 'INR',
+            'receipt':  f'vv_{plan}_{str(uuid.uuid4())[:8]}',
+            'notes': {
+                'plan':    plan,
+                'user_id': str(get_current_user().id),
+            },
+        })
+    except Exception as e:
+        app.logger.error(f'Razorpay order creation failed: {e}')
+        return jsonify({'message': 'Could not create payment order. Please try again.'}), 500
+
+    return jsonify({
+        'order_id': order['id'],
+        'amount':   price_info['amount'],
+        'currency': 'INR',
+        'key_id':   current_app.config['RAZORPAY_KEY_ID'],
+        'plan':     plan,
+        'label':    price_info['label'],
+    }), 200
+
+
+@app.route('/api/payment/verify', methods=['POST'])
+@login_required_api
+def api_verify_payment():
+    """
+    Step 2 — Verify Razorpay payment signature & upgrade the user's plan.
+    Called by the frontend after the Razorpay popup reports payment.success.
+    """
+    data = request.get_json(silent=True) or {}
+    razorpay_order_id   = data.get('razorpay_order_id',   '')
+    razorpay_payment_id = data.get('razorpay_payment_id', '')
+    razorpay_signature  = data.get('razorpay_signature',  '')
+    plan                = (data.get('plan') or '').lower().strip()
+
+    if not all([razorpay_order_id, razorpay_payment_id, razorpay_signature, plan]):
+        return jsonify({'message': 'Missing payment verification fields.'}), 400
+
+    if plan not in PLAN_PRICES:
+        return jsonify({'message': f"Unknown plan '{plan}'."}), 400
+
+    # ── Cryptographic signature verification ──────────────────────────
+    # Razorpay signs  razorpay_order_id + '|' + razorpay_payment_id
+    # with your Key Secret using HMAC-SHA256.
+    key_secret = current_app.config.get('RAZORPAY_KEY_SECRET', '')
+    body       = f'{razorpay_order_id}|{razorpay_payment_id}'
+    expected   = hmac.new(
+        key_secret.encode(),
+        body.encode(),
+        hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(expected, razorpay_signature):
+        app.logger.warning(
+            f'Razorpay signature mismatch for order {razorpay_order_id}'
+        )
+        return jsonify({'message': 'Payment signature verification failed.'}), 400
+
+    # ── Upgrade the subscription ───────────────────────────────────
+    user = get_current_user()
+    sub  = user.subscription
+    if sub:
+        sub.plan             = plan
+        sub.is_active        = True
+        sub.payment_method   = 'razorpay'
+        sub.started_at       = datetime.now(timezone.utc)
+        sub.expires_at       = None   # monthly — no hard expiry for now
+        sub.monthly_uploads_used = 0  # reset counter on upgrade
+    else:
+        sub = Subscription(
+            user_id=user.id,
+            plan=plan,
+            is_active=True,
+            payment_method='razorpay',
+        )
+        db.session.add(sub)
+
+    db.session.commit()
+    app.logger.info(
+        f'User {user.id} upgraded to {plan} via Razorpay order {razorpay_order_id}'
+    )
+
+    return jsonify({
+        'message': f'Plan upgraded to {plan.upper()} successfully!',
+        'plan':    plan,
+    }), 200
+
+
+@app.route('/api/payment/webhook', methods=['POST'])
+def api_payment_webhook():
+    """
+    Optional Razorpay webhook for async payment confirmation.
+    Configure in Razorpay Dashboard → Settings → Webhooks.
+    Active events: payment.captured
+    """
+    payload   = request.get_data(as_text=True)
+    signature = request.headers.get('X-Razorpay-Signature', '')
+    secret    = current_app.config.get('RAZORPAY_KEY_SECRET', '')
+
+    expected = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, signature):
+        return jsonify({'error': 'Invalid webhook signature'}), 400
+
+    event = (request.get_json(silent=True) or {}).get('event', '')
+    app.logger.info(f'Razorpay webhook received: {event}')
+    # payment.captured fires after payment.success — plan is already upgraded by /verify.
+    # This endpoint is here for production reliability (retries, refunds, etc.).
+    return jsonify({'status': 'ok'}), 200
+
 
 if __name__ == '__main__':
     app.run(debug=True)

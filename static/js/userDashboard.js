@@ -499,16 +499,16 @@ async function renderUpgradePlans() {
 
   const planMeta = {
     pro: {
-      price: '₹499',
+      price: '$29',
       cta: 'Upgrade to Pro',
       recommended: true,
       extraFeatures: ['Priority GPU processing', 'Advanced adversarial protection', 'Freq-domain perturbation'],
     },
     business: {
-      price: '₹1,499',
+      price: '$149',
       cta: 'Get Business',
       recommended: false,
-      extraFeatures: ['Dedicated processing queue', 'Team collaboration (coming soon)', 'Custom watermark branding'],
+      extraFeatures: ['Dedicated processing queue'],
     },
   };
 
@@ -539,10 +539,116 @@ async function renderUpgradePlans() {
   }).join('');
 }
 
-function handlePlanCTA(plan) {
-  // Placeholder: replace this URL with your real payment / contact page
-  alert(`Redirecting to ${plan} plan checkout...\n\nIntegrate your payment gateway here (Razorpay, Stripe, etc.)`);
-  // window.location.href = `/upgrade/${plan}`;
+// ════════════════════════════════════════════════════════════════════
+// RAZORPAY CHECKOUT (dashboard upgrade modal)
+// ════════════════════════════════════════════════════════════════════
+async function handlePlanCTA(plan) {
+  // Disable the button while we talk to the server
+  const btns = document.querySelectorAll(`.plan-cta`);
+  btns.forEach(b => b.disabled = true);
+
+  try {
+    // ── Step 1: Create Razorpay order server-side ────────────────────
+    const orderRes = await fetch('/api/payment/create-order', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ plan }),
+    });
+    const orderData = await orderRes.json();
+
+    if (!orderRes.ok) {
+      alert(orderData.message || 'Could not initiate payment. Please try again.');
+      btns.forEach(b => b.disabled = false);
+      return;
+    }
+
+    // ── Step 2: Open Razorpay checkout popup ──────────────────────
+    const options = {
+      key:         orderData.key_id,
+      amount:      orderData.amount,
+      currency:    orderData.currency,
+      name:        'VigilantVideo',
+      description: orderData.label,
+      order_id:    orderData.order_id,
+      theme:       { color: '#00e5ff' },
+      prefill:     {},
+      handler: async function (response) {
+        // ── Step 3: Verify signature & upgrade plan in DB ─────────
+        try {
+          const verifyRes = await fetch('/api/payment/verify', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              razorpay_order_id:   response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature:  response.razorpay_signature,
+              plan,
+            }),
+          });
+          const verifyData = await verifyRes.json();
+
+          if (verifyRes.ok) {
+            closeUpgradeModal();
+            showDashboardPaymentSuccess(plan);
+          } else {
+            alert('Verification failed: ' + (verifyData.message || 'Unknown error'));
+            btns.forEach(b => b.disabled = false);
+          }
+        } catch (e) {
+          alert('Verification error. Please contact support.');
+          btns.forEach(b => b.disabled = false);
+        }
+      },
+      modal: {
+        ondismiss: function () {
+          btns.forEach(b => b.disabled = false);
+        }
+      }
+    };
+
+    const rzp = new Razorpay(options);
+    rzp.open();
+
+  } catch (err) {
+    console.error('Razorpay error:', err);
+    alert('Payment gateway error. Please try again.');
+    btns.forEach(b => b.disabled = false);
+  }
+}
+
+// Shown after a successful payment inside the dashboard
+function showDashboardPaymentSuccess(plan) {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = [
+    'position:fixed', 'inset:0', 'z-index:9999',
+    'background:rgba(4,6,15,0.97)',
+    'display:flex', 'flex-direction:column',
+    'align-items:center', 'justify-content:center',
+    'font-family:Figtree,sans-serif', 'text-align:center', 'gap:1.25rem',
+  ].join(';');
+  const planCap = plan.charAt(0).toUpperCase() + plan.slice(1);
+  overlay.innerHTML = `
+    <div style="font-size:3.5rem">🎉</div>
+    <div style="font-size:1.5rem;font-weight:800;color:var(--cyan,#00e5ff);letter-spacing:0.04em">
+      YOU'RE NOW ON ${plan.toUpperCase()}
+    </div>
+    <p style="color:#7a8a9a;font-size:0.9rem;max-width:340px;line-height:1.6">
+      Your ${planCap} plan is active. Reloading your dashboard with the upgraded limits…
+    </p>
+    <div style="width:220px;height:3px;background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden">
+      <div id="rzpSuccessBar" style="width:0%;height:100%;background:linear-gradient(90deg,#00e5ff,#6366f1);border-radius:99px;transition:width 2.5s linear"></div>
+    </div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => {
+    const bar = document.getElementById('rzpSuccessBar');
+    if (bar) bar.style.width = '100%';
+  });
+  // Reload the dashboard data so plan badge + limits update instantly
+  setTimeout(async () => {
+    _plansCache = null;  // force upgrade modal to re-fetch fresh plan data next time
+    await loadDashboard();
+    document.body.removeChild(overlay);
+  }, 2700);
 }
 
 function openLogoutModal()  { document.getElementById('logoutModal').classList.add('open'); }

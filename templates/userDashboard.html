@@ -10,6 +10,8 @@
 
 <!-- Link to your new separated CSS file -->
 <link rel="stylesheet" href="{{ url_for('static', filename='css/userDashboard.css') }}">
+<!-- Razorpay Checkout SDK -->
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 
 </head>
 <body>
@@ -27,7 +29,7 @@
       </svg>
     </div>
     <div class="gate-title">ACCESS REQUIRED</div>
-    <p class="gate-sub">You need to be signed in to access your ShieldAI dashboard. Sign in to manage your protected videos.</p>
+    <p class="gate-sub">You need to be signed in to access your VigilantVideo dashboard. Sign in to manage your protected videos.</p>
     <div class="gate-btns">
       <a href="/login" class="gate-btn primary">SIGN IN</a>
       <a href="/register" class="gate-btn secondary">Create Free Account</a>
@@ -69,22 +71,19 @@
         <div class="stat-card">
           <div class="sc-label">Total Videos Protected</div>
           <div class="sc-val cyan" id="statVideos">24</div>
-          <div class="sc-sub up">+3 this week</div>
         </div>
         <div class="stat-card">
           <div class="sc-label">Processing Now</div>
           <div class="sc-val amber" id="statProc">2</div>
-          <div class="sc-sub warn">est. 4 min remaining</div>
         </div>
         <div class="stat-card">
           <div class="sc-label">Scrape Attempts Blocked</div>
           <div class="sc-val red" id="statBlocked">138</div>
-          <div class="sc-sub up">+12 today</div>
         </div>
         <div class="stat-card">
           <div class="sc-label">Storage Used</div>
           <div class="sc-val green" id="statStorage">6.2 GB</div>
-          <div class="sc-sub">of 10 GB</div>
+          <div class="sc-sub">of 200 GB</div>
         </div>
       </div>
 
@@ -92,7 +91,7 @@
       <div class="storage-card">
         <div class="storage-head">
           <span class="storage-title">Storage</span>
-          <span class="storage-nums"><strong>6.2 GB</strong> of 10 GB used</span>
+          <span class="storage-nums"><strong>6.2 GB</strong> of 200 GB used</span>
         </div>
         <div class="storage-bar-track">
           <div class="storage-bar-fill" id="storageFill" style="width:62%"></div>

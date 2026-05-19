@@ -9,6 +9,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+<!-- Razorpay Checkout SDK -->
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body>
 
@@ -187,8 +189,8 @@
         </div>
       </div>
       <div class="about-team">
-        <div class="team-chip"><div class="team-avatar" style="background:var(--accent-subtle);color:var(--accent-light)">RD</div>Rakshan D</div>
-        <div class="team-chip"><div class="team-avatar" style="background:var(--warning-subtle);color:var(--warning)">RS</div>Riya Solanki</div>
+        <div class="team-chip"><div class="team-avatar" style="background:var(--accent-subtle);color:var(--accent-light)">RS</div>Riya Solanki</div>
+        <div class="team-chip"><div class="team-avatar" style="background:var(--warning-subtle);color:var(--warning)">RD</div>Rakshan D</div>
         <div class="team-chip"><div class="team-avatar" style="background:var(--success-subtle);color:var(--success)">MM</div>Mugil M</div>
       </div>
     </div>
@@ -376,35 +378,46 @@
         <li>3 Videos per month</li>
         <li>720p Resolution</li>
       </ul>
-      <a href="{{ url_for('register') }}" class="btn-hero secondary">Get Started</a>
+      <a href="{{ url_for('register') }}" class="btn-hero secondary" id="pricing-free-btn">Get Started</a>
     </div>
 
     <!-- Pro Plan -->
     <div class="step-card price-card featured">
       <div class="plan-badge">Most Popular</div>
       <div class="step-num" style="color: var(--accent-glow)">PRO</div>
-      <div class="price-value">$19<span>/mo</span></div>
+      <div class="price-value">$29<span>/mo</span></div>
       <h3 class="step-title">Creator Pro</h3>
       <ul class="price-list">
-        <li>Advanced Multi-Layer Defense</li>
-        <li>Unlimited Protected Videos</li>
-        <li>4K UHD Support</li>
-        <li>Priority Processing</li>
+        <li>50 uploads per month</li>
+        <li>1 GB per file</li>
+        <li>30 min max length</li>
+        <li>Priority GPU Processing</li>
+        <li>Advanced adversarial protection</li>
+        <li>Freq-domain perturbations</li>
       </ul>
-      <a href="{{ url_for('register') }}" class="btn-hero primary">Get Started Pro</a>
+      {% if session.get('user_id') %}
+        <button class="btn-hero primary" id="pricing-pro-btn" onclick="initRazorpayCheckout('pro')">Upgrade to Pro →</button>
+      {% else %}
+        <a href="{{ url_for('register') }}" class="btn-hero primary" id="pricing-pro-btn">Get Started Pro</a>
+      {% endif %}
     </div>
 
-    <!-- Enterprise Plan -->
+    <!-- Business Plan -->
     <div class="step-card price-card">
-      <div class="step-num">TEAM</div>
-      <div class="price-value">Custom</div>
+      <div class="step-num">Business</div>
+      <div class="price-value">₹12,400<span>/mo</span></div>
       <h3 class="step-title">Studio</h3>
       <ul class="price-list">
-        <li>API Access & SDK</li>
-        <li>Team Collaboration Tools</li>
-        <li>Dedicated Support</li>
+        <li>Unlimited uploads/month</li>
+        <li>5 GB per file</li>
+        <li>2 hr max length</li>
+        <li>Dedicated processing queue</li>
       </ul>
-      <a href="#" class="btn-hero secondary">Contact Sales</a>
+      {% if session.get('user_id') %}
+        <button class="btn-hero secondary" id="pricing-business-btn" onclick="initRazorpayCheckout('business')">Get Business →</button>
+      {% else %}
+        <a href="{{ url_for('register') }}" class="btn-hero secondary" id="pricing-business-btn">Get Started Business</a>
+      {% endif %}
     </div>
   </div>
 </section>
@@ -430,10 +443,119 @@
   </div>
   <div class="footer-bottom">
     <div class="footer-copy">© 2026 Vigilant Video. All rights reserved.</div>
-    <div class="footer-copy">Built by Rakshan D · Riya Solanki · Mugil M</div>
+    <div class="footer-copy">Built by Riya Solanki · Rakshan D · Mugil M</div>
   </div>
 </footer>
 
 </div><script src="{{ url_for('static', filename='js/app.js') }}"></script>
+
+<!-- ══ RAZORPAY CHECKOUT LOGIC (index.html) ══ -->
+<script>
+/**
+ * initRazorpayCheckout(plan)
+ * Called when a logged-in user clicks a pricing CTA on the landing page.
+ * Creates a server-side order then opens the Razorpay checkout popup.
+ */
+async function initRazorpayCheckout(plan) {
+  const btn = document.getElementById(`pricing-${plan}-btn`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+
+  try {
+    // Step 1: create Razorpay order server-side
+    const orderRes = await fetch('/api/payment/create-order', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ plan }),
+    });
+    const orderData = await orderRes.json();
+
+    if (!orderRes.ok) {
+      alert(orderData.message || 'Could not initiate payment. Please try again.');
+      if (btn) { btn.disabled = false; btn.textContent = plan === 'pro' ? 'Upgrade to Pro →' : 'Get Business →'; }
+      return;
+    }
+
+    // Step 2: open Razorpay checkout popup
+    const options = {
+      key:         orderData.key_id,
+      amount:      orderData.amount,
+      currency:    orderData.currency,
+      name:        'VigilantVideo',
+      description: orderData.label,
+      order_id:    orderData.order_id,
+      theme:       { color: '#6366f1' },
+      prefill:     {},
+      handler: async function (response) {
+        // Step 3: verify payment signature server-side
+        try {
+          const verifyRes = await fetch('/api/payment/verify', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              razorpay_order_id:   response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature:  response.razorpay_signature,
+              plan,
+            }),
+          });
+          const verifyData = await verifyRes.json();
+          if (verifyRes.ok) {
+            // Show success banner then redirect to dashboard
+            showPaymentSuccess(plan);
+          } else {
+            alert('Payment verified failed: ' + (verifyData.message || 'Unknown error'));
+          }
+        } catch (e) {
+          alert('Verification error. Please contact support.');
+        }
+      },
+      modal: {
+        ondismiss: function () {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = plan === 'pro' ? 'Upgrade to Pro →' : 'Get Business →';
+          }
+        }
+      }
+    };
+
+    const rzp = new Razorpay(options);
+    rzp.open();
+
+  } catch (err) {
+    console.error('Razorpay init error:', err);
+    alert('Payment gateway error. Please try again.');
+    if (btn) { btn.disabled = false; btn.textContent = plan === 'pro' ? 'Upgrade to Pro →' : 'Get Business →'; }
+  }
+}
+
+function showPaymentSuccess(plan) {
+  // Inject a full-screen success overlay then redirect
+  const overlay = document.createElement('div');
+  overlay.style.cssText = [
+    'position:fixed', 'inset:0', 'z-index:9999',
+    'background:rgba(10,12,18,0.97)',
+    'display:flex', 'flex-direction:column',
+    'align-items:center', 'justify-content:center',
+    'font-family:Inter,sans-serif', 'text-align:center', 'gap:1.25rem',
+  ].join(';');
+  overlay.innerHTML = `
+    <div style="font-size:3.5rem">🎉</div>
+    <div style="font-size:1.6rem;font-weight:800;color:#a5b4fc">
+      Welcome to ${plan.charAt(0).toUpperCase()+plan.slice(1)}!
+    </div>
+    <p style="color:#94a3b8;font-size:0.95rem;max-width:360px">
+      Your plan has been activated. Redirecting to your dashboard…
+    </p>
+    <div style="width:200px;height:4px;background:rgba(255,255,255,0.08);border-radius:99px;overflow:hidden">
+      <div id="successBar" style="width:0%;height:100%;background:linear-gradient(90deg,#6366f1,#a5b4fc);border-radius:99px;transition:width 2.5s linear"></div>
+    </div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => {
+    document.getElementById('successBar').style.width = '100%';
+  });
+  setTimeout(() => { window.location.href = '/dashboard'; }, 2600);
+}
+</script>
 </body>
 </html>

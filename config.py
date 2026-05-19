@@ -56,6 +56,10 @@ class Config:
 
     ALLOWED_EXTENSIONS = {'mp4', 'mov', 'avi', 'mkv'}
 
+    # ── Razorpay Payment Gateway ───────────────────────────────────────
+    RAZORPAY_KEY_ID     = os.environ.get('RAZORPAY_KEY_ID',     '')
+    RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '')
+
     # ── Session ────────────────────────────────────────────────────────
     SESSION_COOKIE_HTTPONLY    = True
     SESSION_COOKIE_SAMESITE    = 'Lax'
