@@ -9,7 +9,7 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 
-import razorpay
+import requests as http_requests
 
 # Load .env into os.environ BEFORE config.py reads it
 from dotenv import load_dotenv
@@ -702,11 +702,18 @@ PLAN_PRICES = {
     'business': {'amount': 1240000, 'label': 'Business Plan — ₹12,400/month'},
 }
 
-def get_razorpay_client():
-    return razorpay.Client(
-        auth=(current_app.config['RAZORPAY_KEY_ID'],
-              current_app.config['RAZORPAY_KEY_SECRET'])
+def razorpay_create_order(payload: dict) -> dict:
+    """Create a Razorpay order via direct REST API (no SDK / no pkg_resources)."""
+    key_id     = current_app.config['RAZORPAY_KEY_ID']
+    key_secret = current_app.config['RAZORPAY_KEY_SECRET']
+    resp = http_requests.post(
+        'https://api.razorpay.com/v1/orders',
+        json=payload,
+        auth=(key_id, key_secret),
+        timeout=10,
     )
+    resp.raise_for_status()
+    return resp.json()
 
 
 @app.route('/api/payment/create-order', methods=['POST'])
@@ -726,10 +733,9 @@ def api_create_order():
         return jsonify({'message': 'Payment gateway not configured. Please contact support.'}), 503
 
     price_info = PLAN_PRICES[plan]
-    rz = get_razorpay_client()
 
     try:
-        order = rz.order.create({
+        order = razorpay_create_order({
             'amount':   price_info['amount'],
             'currency': 'INR',
             'receipt':  f'vv_{plan}_{str(uuid.uuid4())[:8]}',
