@@ -1573,3 +1573,91 @@ footer {
         margin: 1rem 0;
     }
 }
+
+/* ══════════════════════════════════════════
+   COMPACT FEEDBACK GRID SYSTEM (REPLACEMENT)
+══════════════════════════════════════════ */
+.reviews-masonry-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* 2 clean, elegant columns */
+    gap: 0.875rem; /* Tight spacing between cards */
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.review-card {
+    background: rgba(22, 25, 34, 0.6); /* Slightly more transparent */
+    border: 1px solid var(--border);
+    border-radius: 8px; /* Sharper, cleaner corners */
+    padding: 1rem; /* Reduced padding from 1.5rem */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    transition: all 0.2s var(--ease);
+}
+
+.review-card:hover {
+    border-color: var(--accent); /* Clean highlight tint on hover */
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Slim, clean left-accent borders instead of thick top borders */
+.review-card.accent-border { border-left: 3px solid var(--accent); }
+.review-card.success-border { border-left: 3px solid var(--success); }
+.review-card.warning-border { border-left: 3px solid var(--warning); }
+
+/* Hidden quotes to maximize text area space */
+.review-quote-mark {
+    display: none; 
+}
+
+.review-text {
+    font-size: 0.8rem !important; /* Smaller, crisp readability font */
+    line-height: 1.5 !important;
+    color: var(--text-secondary) !important;
+    margin-bottom: 0.75rem !important;
+    font-style: italic;
+}
+
+.review-user-footer {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    padding-top: 0.625rem;
+}
+
+.review-avatar {
+    width: 26px; /* Scaled down avatar bubble */
+    height: 26px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 0.65rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.review-user-name {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+.review-user-role {
+    font-size: 0.68rem;
+    color: var(--text-tertiary);
+    font-weight: 500;
+}
+
+/* Responsive collapse for single-view mobile layouts */
+@media(max-width: 768px) {
+    .reviews-masonry-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+}
