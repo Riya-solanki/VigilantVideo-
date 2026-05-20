@@ -24,17 +24,11 @@ from flask import (
     jsonify, session, redirect, url_for
 )
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-
 from config import config
 from models import (
     db, User, ProtectionJob, Subscription,
     DownloadLog, UsageLimit, WatermarkActivation
 )
-
-limiter = Limiter(key_func=get_remote_address)
-
 
 # ── FIX Bug 1: Correct MIME types for all supported video formats ──────────
 # video/mov, video/avi, video/mkv are NOT valid MIME types.
@@ -118,20 +112,7 @@ def create_app(env=None):
     env = env or os.environ.get('FLASK_ENV', 'default')
     app.config.from_object(config[env])
 
-    import sys
-    if 'pytest' in sys.modules or env == 'testing' or app.config.get('TESTING'):
-        app.config['RATELIMIT_STORAGE_URI'] = 'memory://'
-    else:
-        app.config['RATELIMIT_STORAGE_URI'] = app.config.get('REDIS_URL', 'redis://localhost:6379')
-
     db.init_app(app)
-    limiter.init_app(app)
-
-    @app.errorhandler(429)
-    def ratelimit_handler(e):
-        return jsonify({
-            "message": "Too many requests. Please try again later."
-        }), 429
 
     with app.app_context():
         db.create_all()          # Create tables on startup if they don't exist
@@ -229,7 +210,6 @@ def dashboard():
 # API — AUTH (LOGIN / REGISTER / LOGOUT / ME)
 # ══════════════════════════════════════════════════════════════════════
 @app.route('/api/auth/login', methods=['POST'])
-@limiter.limit("5 per minute")
 def api_login():
     data     = request.get_json(silent=True) or {}
     username = (data.get('username') or '').strip()
@@ -243,7 +223,6 @@ def api_login():
     return jsonify({'message': 'Logged in.', 'user': user.to_dict()}), 200
 
 @app.route('/api/auth/register', methods=['POST'])
-@limiter.limit("5 per minute")
 def api_register():
     data     = request.get_json(silent=True) or {}
     username = (data.get('username') or '').strip()
@@ -418,7 +397,6 @@ def _time_ago(dt):
 # ══════════════════════════════════════════════════════════════════════
 @app.route('/api/upload/presign', methods=['POST'])
 @login_required_api
-@limiter.limit("20 per minute")
 def api_presign_upload():
     user = get_current_user()
     allowed, msg = check_upload_limit(user)
