@@ -23,7 +23,7 @@
     <div class="nav-logo-icon">
       <svg viewBox="0 0 24 24" fill="none">
         <path d="M12 2L4 6V12C4 16.97 7.53 21.64 12 23C16.47 21.64 20 16.97 20 12V6L12 2Z" fill="white" opacity="0.9"/>
-        <path d="M9 12L11 14L15 10" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M9 12L11 14L15 10" stroke="#e11d48" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </div>
     <span class="nav-logo-text">Vigilant<span>Video</span></span>
@@ -427,7 +427,7 @@
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1.5rem;margin-bottom:1.5rem">
     <a href="#" class="nav-logo" style="text-decoration:none">
       <div class="nav-logo-icon">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M12 2L4 6V12C4 16.97 7.53 21.64 12 23C16.47 21.64 20 16.97 20 12V6L12 2Z" fill="white" opacity="0.9"/><path d="M9 12L11 14L15 10" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 2L4 6V12C4 16.97 7.53 21.64 12 23C16.47 21.64 20 16.97 20 12V6L12 2Z" fill="white" opacity="0.9"/><path d="M9 12L11 14L15 10" stroke="#e11d48" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </div>
       <span class="nav-logo-text">Vigilant<span>Video</span></span>
     </a>
@@ -485,7 +485,7 @@ async function initRazorpayCheckout(plan) {
       name:        'VigilantVideo',
       description: orderData.label,
       order_id:    orderData.order_id,
-      theme:       { color: '#6366f1' },
+      theme:       { color: '#e11d48' },
       prefill:     {},
       handler: async function (response) {
         // Step 3: verify payment signature server-side
@@ -543,14 +543,14 @@ function showPaymentSuccess(plan) {
   ].join(';');
   overlay.innerHTML = `
     <div style="font-size:3.5rem">🎉</div>
-    <div style="font-size:1.6rem;font-weight:800;color:#a5b4fc">
+    <div style="font-size:1.6rem;font-weight:800;color:#fb7185">
       Welcome to ${plan.charAt(0).toUpperCase()+plan.slice(1)}!
     </div>
     <p style="color:#94a3b8;font-size:0.95rem;max-width:360px">
       Your plan has been activated. Redirecting to your dashboard…
     </p>
     <div style="width:200px;height:4px;background:rgba(255,255,255,0.08);border-radius:99px;overflow:hidden">
-      <div id="successBar" style="width:0%;height:100%;background:linear-gradient(90deg,#6366f1,#a5b4fc);border-radius:99px;transition:width 2.5s linear"></div>
+      <div id="successBar" style="width:0%;height:100%;background:linear-gradient(90deg,#e11d48,#fb7185);border-radius:99px;transition:width 2.5s linear"></div>
     </div>`;
   document.body.appendChild(overlay);
   requestAnimationFrame(() => {

@@ -8,6 +8,7 @@ import hmac
 import hashlib
 from datetime import datetime, timedelta, timezone
 from functools import wraps
+from urllib.parse import urlparse
 
 import requests as http_requests
 
@@ -23,12 +24,17 @@ from flask import (
     jsonify, session, redirect, url_for
 )
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from config import config
 from models import (
     db, User, ProtectionJob, Subscription,
     DownloadLog, UsageLimit, WatermarkActivation
 )
+
+limiter = Limiter(key_func=get_remote_address)
+
 
 # ── FIX Bug 1: Correct MIME types for all supported video formats ──────────
 # video/mov, video/avi, video/mkv are NOT valid MIME types.
@@ -87,14 +93,50 @@ def _seed_usage_limits():
         db.session.commit()
 
 
+def verify_redis_url(app):
+    redis_url = app.config.get('REDIS_URL', '')
+    if not redis_url:
+        app.logger.warning("REDIS_URL is not set!")
+        return False
+    try:
+        parsed = urlparse(redis_url)
+        if parsed.scheme not in ('redis', 'rediss'):
+            app.logger.warning(f"Invalid Redis URL scheme: {parsed.scheme}")
+            return False
+        is_localhost = parsed.hostname in ('localhost', '127.0.0.1')
+        if not is_localhost and not parsed.password:
+            app.logger.error("REDIS_URL points to a remote host but does NOT have a password. This is INSECURE.")
+            return False
+    except Exception as e:
+        app.logger.error(f"Error parsing REDIS_URL: {e}")
+        return False
+    return True
+
+
 def create_app(env=None):
     app = Flask(__name__)
     env = env or os.environ.get('FLASK_ENV', 'default')
     app.config.from_object(config[env])
+
+    import sys
+    if 'pytest' in sys.modules or env == 'testing' or app.config.get('TESTING'):
+        app.config['RATELIMIT_STORAGE_URI'] = 'memory://'
+    else:
+        app.config['RATELIMIT_STORAGE_URI'] = app.config.get('REDIS_URL', 'redis://localhost:6379')
+
     db.init_app(app)
+    limiter.init_app(app)
+
+    @app.errorhandler(429)
+    def ratelimit_handler(e):
+        return jsonify({
+            "message": "Too many requests. Please try again later."
+        }), 429
+
     with app.app_context():
         db.create_all()          # Create tables on startup if they don't exist
         _seed_usage_limits()     # Ensure plan rows exist — safe if already seeded
+        verify_redis_url(app)    # Validate remote Redis url security
     return app
 
 app = create_app()
@@ -187,6 +229,7 @@ def dashboard():
 # API — AUTH (LOGIN / REGISTER / LOGOUT / ME)
 # ══════════════════════════════════════════════════════════════════════
 @app.route('/api/auth/login', methods=['POST'])
+@limiter.limit("5 per minute")
 def api_login():
     data     = request.get_json(silent=True) or {}
     username = (data.get('username') or '').strip()
@@ -200,6 +243,7 @@ def api_login():
     return jsonify({'message': 'Logged in.', 'user': user.to_dict()}), 200
 
 @app.route('/api/auth/register', methods=['POST'])
+@limiter.limit("5 per minute")
 def api_register():
     data     = request.get_json(silent=True) or {}
     username = (data.get('username') or '').strip()
@@ -245,29 +289,30 @@ def api_plans():
 def api_dashboard():
     user = get_current_user()
 
-    jobs = ProtectionJob.query.filter_by(user_id=user.id)\
-               .order_by(ProtectionJob.created_at.desc()).all()
-
-    videos_protected  = sum(1 for j in jobs if j.status == 'done')
-    processing_now    = sum(1 for j in jobs if j.status in ('pending', 'processing'))
-    storage_used      = sum(j.original_size_bytes or 0 for j in jobs)
-
-    # FIX Bug 3: user.plan_tier column is never updated when plan changes.
-    # Always read the plan from user.subscription.plan — the single source of truth.
-    plan = user.subscription.plan if user.subscription else 'free'
-    # FIX Bug 8: Replace deprecated .query.get() with db.session.get()
-    limit_row = db.session.get(UsageLimit, plan)
-    storage_limit = (limit_row.max_file_size_bytes
-                     if limit_row and limit_row.max_file_size_bytes != -1
-                     else 10 * 1024 ** 3)
-    uploads_limit = (limit_row.max_videos_per_month if limit_row else 3)
-    uploads_used  = user.subscription.monthly_uploads_used if user.subscription else 0
-
     _s3 = get_s3_client()
     _bucket = current_app.config['R2_BUCKET_NAME']
+
+    # 1. Clean up jobs stuck in pending_presign > 24 hours, and done jobs > 3 days
+    raw_jobs = ProtectionJob.query.filter_by(user_id=user.id).all()
     _changed = False
-    for j in jobs:
-        if (
+    jobs = []
+    for j in raw_jobs:
+        j_created = j.created_at
+        if j_created.tzinfo is None:
+            j_created = j_created.replace(tzinfo=timezone.utc)
+
+        if j.status == 'pending_presign':
+            if datetime.now(timezone.utc) - j_created > timedelta(hours=24):
+                for path in [j.input_path, j.output_path]:
+                    if path:
+                        try:
+                            _s3.delete_object(Bucket=_bucket, Key=path)
+                        except Exception as _e:
+                            app.logger.warning(f"Cleanup: failed to delete {path} from R2: {_e}")
+                db.session.delete(j)
+                _changed = True
+                continue
+        elif (
             j.status == 'done'
             and j.completed_at
             and datetime.now(timezone.utc) - j.completed_at.replace(tzinfo=timezone.utc) > timedelta(days=3)
@@ -279,8 +324,25 @@ def api_dashboard():
                 app.logger.warning(f"Expiry: failed to delete {j.output_path} from R2: {_e}")
             j.status = 'expired'
             _changed = True
+
+        jobs.append(j)
+
     if _changed:
         db.session.commit()
+
+    jobs.sort(key=lambda x: x.created_at, reverse=True)
+
+    videos_protected  = sum(1 for j in jobs if j.status == 'done')
+    processing_now    = sum(1 for j in jobs if j.status in ('pending', 'processing'))
+    storage_used      = sum(j.original_size_bytes or 0 for j in jobs)
+
+    plan = user.subscription.plan if user.subscription else 'free'
+    limit_row = db.session.get(UsageLimit, plan)
+    storage_limit = (limit_row.max_file_size_bytes
+                     if limit_row and limit_row.max_file_size_bytes != -1
+                     else 10 * 1024 ** 3)
+    uploads_limit = (limit_row.max_videos_per_month if limit_row else 3)
+    uploads_used  = user.subscription.monthly_uploads_used if user.subscription else 0
 
     def _job_to_video(j):
         fname = j.original_filename or ''
@@ -356,6 +418,7 @@ def _time_ago(dt):
 # ══════════════════════════════════════════════════════════════════════
 @app.route('/api/upload/presign', methods=['POST'])
 @login_required_api
+@limiter.limit("20 per minute")
 def api_presign_upload():
     user = get_current_user()
     allowed, msg = check_upload_limit(user)
@@ -594,7 +657,9 @@ def api_stream_upload():
 def webhook_job_complete():
     data = request.get_json(silent=True) or {}
 
-    if data.get('webhook_secret') != current_app.config['WEBHOOK_SECRET']:
+    incoming_secret = data.get('webhook_secret') or ''
+    expected_secret = current_app.config['WEBHOOK_SECRET'] or ''
+    if not hmac.compare_digest(incoming_secret.encode('utf-8'), expected_secret.encode('utf-8')):
         return jsonify({"error": "Unauthorized"}), 403
 
     job_id  = data.get('task_id')

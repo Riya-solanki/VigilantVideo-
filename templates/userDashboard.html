@@ -50,6 +50,11 @@
         <div class="live-badge">Live</div>
       </div>
       <div class="topbar-right">
+        <!-- Profile Widget -->
+        <div class="profile-widget" id="profileWidget">
+          <div class="profile-avatar" id="profileAvatar"></div>
+          <span class="profile-name" id="profileName"></span>
+        </div>
         <!-- Plan quota pill — populated by JS -->
         <div class="plan-pill" id="planPill" onclick="openUpgradeModal()" title="Click to view upgrade options">
           <span class="plan-pill-badge" id="planBadge">FREE</span>
@@ -155,7 +160,7 @@
 
           <!-- COMMUNITY FEEDBACK -->
 
-          <div class="panel feedback-card" style="border: 1px dashed var(--cyan); background: rgba(0, 255, 255, 0.03);">
+          <div class="panel feedback-card" style="border: 1px dashed var(--cyan); background: rgba(225, 29, 72, 0.03);">
             <div class="panel-head">
               <div class="panel-title" style="color: var(--cyan);">Community Feedback</div>
             </div>

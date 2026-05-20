@@ -29,6 +29,16 @@ async function loadDashboard() {
     const data = await res.json();
     document.getElementById('authGate').classList.add('hidden');
 
+    // ── Update Profile Widget ──────────────────────────────────────────
+    const widget = document.getElementById('profileWidget');
+    const avatar = document.getElementById('profileAvatar');
+    const name   = document.getElementById('profileName');
+    if (widget && avatar && name && data.user) {
+      widget.style.display = 'flex';
+      name.textContent = data.user.username;
+      avatar.textContent = data.user.initials || data.user.username.slice(0, 2).toUpperCase();
+    }
+
     safeSet('statVideos',  data.stats.videos_protected);
     safeSet('statProc',    data.stats.processing_now);
     safeSet('statBlocked', data.stats.scrape_attempts_blocked);
@@ -570,7 +580,7 @@ async function handlePlanCTA(plan) {
       name:        'VigilantVideo',
       description: orderData.label,
       order_id:    orderData.order_id,
-      theme:       { color: '#00e5ff' },
+      theme:       { color: '#e11d48' },
       prefill:     {},
       handler: async function (response) {
         // ── Step 3: Verify signature & upgrade plan in DB ─────────
@@ -629,14 +639,14 @@ function showDashboardPaymentSuccess(plan) {
   const planCap = plan.charAt(0).toUpperCase() + plan.slice(1);
   overlay.innerHTML = `
     <div style="font-size:3.5rem">🎉</div>
-    <div style="font-size:1.5rem;font-weight:800;color:var(--cyan,#00e5ff);letter-spacing:0.04em">
+    <div style="font-size:1.5rem;font-weight:800;color:var(--cyan,#e11d48);letter-spacing:0.04em">
       YOU'RE NOW ON ${plan.toUpperCase()}
     </div>
     <p style="color:#7a8a9a;font-size:0.9rem;max-width:340px;line-height:1.6">
       Your ${planCap} plan is active. Reloading your dashboard with the upgraded limits…
     </p>
     <div style="width:220px;height:3px;background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden">
-      <div id="rzpSuccessBar" style="width:0%;height:100%;background:linear-gradient(90deg,#00e5ff,#6366f1);border-radius:99px;transition:width 2.5s linear"></div>
+      <div id="rzpSuccessBar" style="width:0%;height:100%;background:linear-gradient(90deg,#e11d48,#fb7185);border-radius:99px;transition:width 2.5s linear"></div>
     </div>`;
   document.body.appendChild(overlay);
   requestAnimationFrame(() => {
@@ -663,9 +673,9 @@ async function doLogout() {
   let W,H,pts=[];
   function resize(){W=c.width=window.innerWidth;H=c.height=window.innerHeight;}
   resize();window.addEventListener('resize',resize);
-  class P{constructor(){this.r()}r(){this.x=Math.random()*W;this.y=Math.random()*H;this.s=Math.random()*1.2+0.3;this.vx=(Math.random()-.5)*.25;this.vy=(Math.random()-.5)*.25;this.a=Math.random()*.35+0.06;}u(){this.x+=this.vx;this.y+=this.vy;if(this.x<0||this.x>W||this.y<0||this.y>H)this.r();}d(){ctx.beginPath();ctx.arc(this.x,this.y,this.s,0,Math.PI*2);ctx.fillStyle=`rgba(0,229,255,${this.a})`;ctx.fill();}}
+  class P{constructor(){this.r()}r(){this.x=Math.random()*W;this.y=Math.random()*H;this.s=Math.random()*1.2+0.3;this.vx=(Math.random()-.5)*.25;this.vy=(Math.random()-.5)*.25;this.a=Math.random()*.35+0.06;}u(){this.x+=this.vx;this.y+=this.vy;if(this.x<0||this.x>W||this.y<0||this.y>H)this.r();}d(){ctx.beginPath();ctx.arc(this.x,this.y,this.s,0,Math.PI*2);ctx.fillStyle=`rgba(225,29,72,${this.a})`;ctx.fill();}}
   for(let i=0;i<50;i++)pts.push(new P());
-  function loop(){ctx.clearRect(0,0,W,H);ctx.strokeStyle='rgba(0,229,255,0.025)';ctx.lineWidth=1;const sz=70;for(let x=0;x<W;x+=sz){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}for(let y=0;y<H;y+=sz){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}pts.forEach(p=>{p.u();p.d();});requestAnimationFrame(loop);}
+  function loop(){ctx.clearRect(0,0,W,H);ctx.strokeStyle='rgba(225,29,72,0.025)';ctx.lineWidth=1;const sz=70;for(let x=0;x<W;x+=sz){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}for(let y=0;y<H;y+=sz){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}pts.forEach(p=>{p.u();p.d();});requestAnimationFrame(loop);}
   loop();
 })();
 

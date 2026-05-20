@@ -13,7 +13,7 @@
   const pwdIn=document.getElementById('password');
   const bars=[document.getElementById('sb1'),document.getElementById('sb2'),document.getElementById('sb3'),document.getElementById('sb4')];
   const strengthLabel=document.getElementById('strengthLabel');
-  const COLORS=['','#ef4444','#f59e0b','#818cf8','#10b981'];
+  const COLORS=['','#ef4444','#f59e0b','#fb7185','#10b981'];
   const LABELS=['','Weak','Fair','Good','Strong'];
 
   function calcStrength(p){

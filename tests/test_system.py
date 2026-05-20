@@ -22,6 +22,38 @@ def register_and_login(client, username='sysuser', password='syspassword'):
     return resp.get_json()['user']
 
 
+def make_s3_mock():
+    """Return a MagicMock for the S3 client with JSON-serializable return values."""
+    m = MagicMock()
+    m.generate_presigned_post.return_value = {
+        'url': 'https://r2.example.com/upload',
+        'fields': {'key': 'raw/test.mp4', 'Content-Type': 'video/mp4'},
+    }
+    m.generate_presigned_url.return_value = 'https://r2.example.com/protected/vid.mp4?sig=xyz'
+    # head_object should NOT raise (file found in R2) — MagicMock default works, but be explicit
+    m.head_object.return_value = {}
+    return m
+
+
+def upload_video_flow(client, filename='myvideo.mp4', filesize=2048):
+    """Simulate the two-step direct R2 upload flow in system tests.
+
+    The caller must have already set up get_s3_client to return make_s3_mock()
+    so that generate_presigned_post returns JSON-serializable data.
+    """
+    presign_resp = client.post('/api/upload/presign', json={
+        'filename': filename,
+        'filesize': filesize
+    })
+    if presign_resp.status_code != 200:
+        return presign_resp
+    job_id = presign_resp.get_json()['job_id']
+    confirm_resp = client.post('/api/upload/confirm', json={
+        'job_id': job_id
+    })
+    return confirm_resp
+
+
 # ─────────────────────────────────────────────────────────────────
 # WORKFLOW 1: FULL REGISTRATION → DASHBOARD FLOW
 # ─────────────────────────────────────────────────────────────────
@@ -33,7 +65,7 @@ class TestRegistrationToDashboardFlow:
         System: A brand-new user can register, then immediately
         view their (empty) dashboard.
         """
-        mock_s3.return_value = MagicMock()
+        mock_s3.return_value = make_s3_mock()
 
         # Step 1 – Register
         r1 = client.post('/api/auth/register',
@@ -52,7 +84,7 @@ class TestRegistrationToDashboardFlow:
         """
         System: User can register, log out, and log back in successfully.
         """
-        mock_s3.return_value = MagicMock()
+        mock_s3.return_value = make_s3_mock()
 
         client.post('/api/auth/register',
                     json={'username': 'bounce_user', 'password': 'pass1234'})
@@ -87,9 +119,8 @@ class TestVideoProtectionLifecycle:
         System: User uploads a video → polls status → webhook fires →
         user downloads the protected file.
         """
-        mock_s3_inst = MagicMock()
+        mock_s3_inst = make_s3_mock()
         mock_s3.return_value = mock_s3_inst
-        mock_s3_inst.generate_presigned_url.return_value = 'https://r2.example.com/protected/vid.mp4?sig=xyz'
         mock_redis_inst = MagicMock()
         mock_redis.return_value = mock_redis_inst
         mock_redis_inst.get.return_value = None
@@ -99,11 +130,7 @@ class TestVideoProtectionLifecycle:
                     json={'username': 'lifecycle_user', 'password': 'secure123'})
 
         # 2. Upload a video
-        upload_resp = client.post(
-            '/api/upload',
-            data={'video': (BytesIO(b'\x00' * 2048), 'myvideo.mp4', 'video/mp4')},
-            content_type='multipart/form-data',
-        )
+        upload_resp = upload_video_flow(client, 'myvideo.mp4', 2048)
         assert upload_resp.status_code == 202
         job_id = upload_resp.get_json()['job_id']
 
@@ -145,18 +172,15 @@ class TestVideoProtectionLifecycle:
         """
         System: When the GPU worker fails, the job status reflects 'error'.
         """
-        mock_s3.return_value = MagicMock()
-        mock_redis.return_value = MagicMock()
-        mock_redis.return_value.get.return_value = None
+        mock_s3.return_value = make_s3_mock()
+        mock_redis_inst = MagicMock()
+        mock_redis_inst.get.return_value = None
+        mock_redis.return_value = mock_redis_inst
 
         client.post('/api/auth/register',
                     json={'username': 'error_user', 'password': 'secure123'})
 
-        upload_resp = client.post(
-            '/api/upload',
-            data={'video': (BytesIO(b'\x00' * 1024), 'fail.mp4', 'video/mp4')},
-            content_type='multipart/form-data',
-        )
+        upload_resp = upload_video_flow(client, 'fail.mp4', 1024)
         job_id = upload_resp.get_json()['job_id']
 
         # GPU worker reports error
@@ -184,18 +208,14 @@ class TestUploadQuotaEnforcement:
         """
         System: Free-plan user can upload 3 videos; the 4th must be denied.
         """
-        mock_s3.return_value = MagicMock()
+        mock_s3.return_value = make_s3_mock()
         mock_redis.return_value = MagicMock()
 
         client.post('/api/auth/register',
                     json={'username': 'quota_user', 'password': 'pass123'})
 
         def upload():
-            return client.post(
-                '/api/upload',
-                data={'video': (BytesIO(b'\x00' * 512), 'clip.mp4', 'video/mp4')},
-                content_type='multipart/form-data',
-            )
+            return upload_video_flow(client, 'clip.mp4', 512)
 
         # First 3 uploads must succeed
         for i in range(3):
@@ -212,7 +232,7 @@ class TestUploadQuotaEnforcement:
         """
         System: After each upload, the dashboard reports an incremented uploads_used.
         """
-        mock_s3.return_value = MagicMock()
+        mock_s3.return_value = make_s3_mock()
         mock_redis.return_value = MagicMock()
 
         client.post('/api/auth/register',
@@ -223,11 +243,7 @@ class TestUploadQuotaEnforcement:
         assert dash1['stats']['uploads_used'] == 0
 
         # Upload one video
-        client.post(
-            '/api/upload',
-            data={'video': (BytesIO(b'\x00' * 512), 'clip.mp4', 'video/mp4')},
-            content_type='multipart/form-data',
-        )
+        upload_video_flow(client, 'clip.mp4', 512)
 
         dash2 = client.get('/api/dashboard').get_json()
         assert dash2['stats']['uploads_used'] == 1
@@ -244,18 +260,14 @@ class TestVideoDeleteLifecycle:
         """
         System: After deleting a video, it must no longer appear in the dashboard.
         """
-        mock_s3.return_value = MagicMock()
+        mock_s3.return_value = make_s3_mock()
         mock_redis.return_value = MagicMock()
 
         client.post('/api/auth/register',
                     json={'username': 'delete_user', 'password': 'pass123'})
 
         # Upload
-        upload_resp = client.post(
-            '/api/upload',
-            data={'video': (BytesIO(b'\x00' * 1024), 'todelete.mp4', 'video/mp4')},
-            content_type='multipart/form-data',
-        )
+        upload_resp = upload_video_flow(client, 'todelete.mp4', 1024)
         job_id = upload_resp.get_json()['job_id']
 
         # Delete
@@ -272,18 +284,14 @@ class TestVideoDeleteLifecycle:
         """
         System: Deleting a job must call S3 delete_object for both raw and protected keys.
         """
-        mock_s3_inst = MagicMock()
+        mock_s3_inst = make_s3_mock()
         mock_s3.return_value = mock_s3_inst
         mock_redis.return_value = MagicMock()
 
         client.post('/api/auth/register',
                     json={'username': 's3_delete_user', 'password': 'pass123'})
 
-        upload_resp = client.post(
-            '/api/upload',
-            data={'video': (BytesIO(b'\x00' * 512), 'clip.mp4', 'video/mp4')},
-            content_type='multipart/form-data',
-        )
+        upload_resp = upload_video_flow(client, 'clip.mp4', 512)
         job_id = upload_resp.get_json()['job_id']
 
         mock_s3_inst.reset_mock()
@@ -304,18 +312,15 @@ class TestMultiUserIsolation:
         """
         System: User B must not be able to download or see User A's jobs.
         """
-        mock_s3.return_value = MagicMock()
-        mock_redis.return_value = MagicMock()
-        mock_redis.return_value.get.return_value = None
+        mock_s3.return_value = make_s3_mock()
+        mock_redis_inst = MagicMock()
+        mock_redis_inst.get.return_value = None
+        mock_redis.return_value = mock_redis_inst
 
         # User A registers and uploads
         client.post('/api/auth/register',
                     json={'username': 'user_a', 'password': 'pass123'})
-        upload_resp = client.post(
-            '/api/upload',
-            data={'video': (BytesIO(b'\x00' * 512), 'private.mp4', 'video/mp4')},
-            content_type='multipart/form-data',
-        )
+        upload_resp = upload_video_flow(client, 'private.mp4', 512)
         job_id_a = upload_resp.get_json()['job_id']
 
         # Log out user A, register user B
@@ -338,7 +343,7 @@ class TestMultiUserIsolation:
         """
         System: Each user's dashboard only includes their own videos.
         """
-        mock_s3.return_value = MagicMock()
+        mock_s3.return_value = make_s3_mock()
 
         # User A
         client.post('/api/auth/register',
@@ -368,17 +373,13 @@ class TestWatermarkPersistence:
         System: When the webhook marks a job done with metrics,
         a WatermarkActivation record must be saved to the DB.
         """
-        mock_s3.return_value = MagicMock()
+        mock_s3.return_value = make_s3_mock()
         mock_redis.return_value = MagicMock()
 
         client.post('/api/auth/register',
                     json={'username': 'wm_user', 'password': 'pass123'})
 
-        upload_resp = client.post(
-            '/api/upload',
-            data={'video': (BytesIO(b'\x00' * 512), 'wm_video.mp4', 'video/mp4')},
-            content_type='multipart/form-data',
-        )
+        upload_resp = upload_video_flow(client, 'wm_video.mp4', 512)
         job_id = upload_resp.get_json()['job_id']
 
         metrics = {

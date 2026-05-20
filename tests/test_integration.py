@@ -14,6 +14,18 @@ from models import db, User, Subscription, ProtectionJob, UsageLimit, DownloadLo
 from werkzeug.security import generate_password_hash
 
 
+def make_s3_mock():
+    """Return a MagicMock for the S3 client with JSON-serializable return values."""
+    m = MagicMock()
+    m.generate_presigned_post.return_value = {
+        'url': 'https://r2.example.com/upload',
+        'fields': {'key': 'raw/test.mp4', 'Content-Type': 'video/mp4'},
+    }
+    m.generate_presigned_url.return_value = 'https://r2.example.com/protected/vid.mp4?sig=xyz'
+    m.head_object.return_value = {}  # file found — don't raise
+    return m
+
+
 # ─────────────────────────────────────────────────────────────────
 # 1. AUTH — REGISTER
 # ─────────────────────────────────────────────────────────────────
@@ -216,44 +228,57 @@ class TestAPIDashboard:
 class TestAPIUpload:
 
     def test_upload_requires_auth(self, client):
-        """POST /api/upload without session returns 401."""
-        resp = client.post('/api/upload')
+        """POST /api/upload/presign without session returns 401."""
+        resp = client.post('/api/upload/presign')
         assert resp.status_code == 401
 
     @patch('app.get_redis_client')
     @patch('app.get_s3_client')
     def test_upload_success(self, mock_s3, mock_redis, auth_client, tmp_path):
         """Valid video upload dispatches job and returns 202."""
-        mock_s3_inst = MagicMock()
+        mock_s3_inst = make_s3_mock()
         mock_s3.return_value = mock_s3_inst
         mock_redis_inst = MagicMock()
         mock_redis.return_value = mock_redis_inst
 
+        presign_resp = auth_client.post(
+            '/api/upload/presign',
+            json={'filename': 'clip.mp4', 'filesize': 1024}
+        )
+        assert presign_resp.status_code == 200
+        data = presign_resp.get_json()
+        assert 'job_id' in data
+        job_id = data['job_id']
+
         resp = auth_client.post(
-            '/api/upload',
-            data={'video': (BytesIO(b'\x00' * 1024), 'clip.mp4', 'video/mp4')},
-            content_type='multipart/form-data',
+            '/api/upload/confirm',
+            json={'job_id': job_id}
         )
         assert resp.status_code == 202
-        data = resp.get_json()
-        assert 'job_id' in data
-        assert data['status'] == 'pending'
+        confirm_data = resp.get_json()
+        assert confirm_data['status'] == 'pending'
 
     @patch('app.get_redis_client')
     @patch('app.get_s3_client')
     def test_upload_increments_counter(self, mock_s3, mock_redis, auth_client, app, sample_user):
         """Successful upload must increment monthly_uploads_used."""
-        mock_s3.return_value = MagicMock()
+        mock_s3.return_value = make_s3_mock()
         mock_redis.return_value = MagicMock()
 
         with app.app_context():
             user = db.session.merge(sample_user)
             before = user.subscription.monthly_uploads_used
 
+        presign_resp = auth_client.post(
+            '/api/upload/presign',
+            json={'filename': 'test.mp4', 'filesize': 512}
+        )
+        assert presign_resp.status_code == 200
+        job_id = presign_resp.get_json()['job_id']
+
         auth_client.post(
-            '/api/upload',
-            data={'video': (BytesIO(b'\x00' * 512), 'test.mp4', 'video/mp4')},
-            content_type='multipart/form-data',
+            '/api/upload/confirm',
+            json={'job_id': job_id}
         )
 
         with app.app_context():
@@ -263,15 +288,14 @@ class TestAPIUpload:
 
     def test_upload_no_file_returns_400(self, auth_client):
         """Upload with no file attached returns 400."""
-        resp = auth_client.post('/api/upload', data={}, content_type='multipart/form-data')
+        resp = auth_client.post('/api/upload/presign', json={'filename': '', 'filesize': 0})
         assert resp.status_code == 400
 
     def test_upload_unsupported_extension_returns_415(self, auth_client):
         """Uploading a .txt file returns 415 Unsupported Media."""
         resp = auth_client.post(
-            '/api/upload',
-            data={'video': (BytesIO(b'data'), 'file.txt', 'text/plain')},
-            content_type='multipart/form-data',
+            '/api/upload/presign',
+            json={'filename': 'file.txt', 'filesize': 100},
         )
         assert resp.status_code == 415
 
@@ -279,7 +303,7 @@ class TestAPIUpload:
     @patch('app.get_s3_client')
     def test_upload_denied_at_limit(self, mock_s3, mock_redis, auth_client, app, sample_user):
         """Upload returns 429 when monthly limit is reached."""
-        mock_s3.return_value = MagicMock()
+        mock_s3.return_value = make_s3_mock()
         mock_redis.return_value = MagicMock()
 
         with app.app_context():
@@ -288,9 +312,8 @@ class TestAPIUpload:
             db.session.commit()
 
         resp = auth_client.post(
-            '/api/upload',
-            data={'video': (BytesIO(b'\x00' * 512), 'x.mp4', 'video/mp4')},
-            content_type='multipart/form-data',
+            '/api/upload/presign',
+            json={'filename': 'x.mp4', 'filesize': 512},
         )
         assert resp.status_code == 429
 

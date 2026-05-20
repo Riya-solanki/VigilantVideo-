@@ -8,6 +8,26 @@ import os
 # Make sure the project root is importable
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+import werkzeug.security
+
+# Speed up password hashing for tests
+_orig_generate_password_hash = werkzeug.security.generate_password_hash
+_orig_check_password_hash = werkzeug.security.check_password_hash
+
+def fast_generate_password_hash(password, method=None, salt_length=None):
+    return f"plain:{password}"
+
+def fast_check_password_hash(pwhash, password):
+    if pwhash.startswith("plain:"):
+        return pwhash == f"plain:{password}"
+    try:
+        return _orig_check_password_hash(pwhash, password)
+    except Exception:
+        return pwhash == password
+
+werkzeug.security.generate_password_hash = fast_generate_password_hash
+werkzeug.security.check_password_hash = fast_check_password_hash
+
 # Import the module-level app (which has ALL routes registered via decorators)
 import app as app_module
 from models import db, User, Subscription, ProtectionJob, UsageLimit, WatermarkActivation, DownloadLog
@@ -16,9 +36,9 @@ import uuid
 from datetime import datetime
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope='session')
 def app():
-    """Configure the existing Flask app for testing with in-memory SQLite."""
+    """Configure the existing Flask app for testing with in-memory SQLite once per session."""
     flask_app = app_module.app
 
     flask_app.config.update({
@@ -45,6 +65,25 @@ def app():
         yield flask_app
         db.session.remove()
         db.drop_all()
+
+
+@pytest.fixture(scope='function', autouse=True)
+def cleanup_database(app):
+    """Delete all database rows between tests to ensure isolation, preserving seed data."""
+    yield
+    with app.app_context():
+        db.session.rollback()
+        for table in reversed(db.metadata.sorted_tables):
+            if table.name != 'usage_limits':
+                db.session.execute(table.delete())
+        db.session.commit()
+
+
+@pytest.fixture(scope='function', autouse=True)
+def reset_rate_limiter():
+    """Reset the rate limiter between tests to prevent rate limits leaking across tests."""
+    from app import limiter
+    limiter.reset()
 
 
 def _seed_usage_limits():
